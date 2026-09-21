@@ -1,68 +1,153 @@
-import Image from "next/image";
+import React from 'react';
+import Link from 'next/link';
+import { createClient } from '@/lib/supabase/server';
+import { Listing } from '@/types/listing';
+import ListingCard from '@/components/listing/ListingCard';
+import { Plus, Search, Sparkles } from 'lucide-react';
 
-export default function Home() {
+interface HomePageProps {
+  searchParams: Promise<{
+    q?: string;
+    spec?: string;
+    emirate?: string;
+  }>;
+}
+
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const resolvedParams = await searchParams;
+  const supabase = await createClient();
+
+  let query = supabase
+    .from('listings')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (resolvedParams.spec === 'GCC') {
+    query = query.eq('specs', 'GCC');
+  }
+
+  if (resolvedParams.emirate) {
+    query = query.eq('emirate', resolvedParams.emirate);
+  }
+
+  const { data: listings } = await query;
+  const typedListings = (listings || []) as unknown as Listing[];
+
+  const filteredListings = resolvedParams.q
+    ? typedListings.filter((car) => {
+        const fullTitle = `${car.year} ${car.make} ${car.model} ${car.trim || ''}`.toLowerCase();
+        return fullTitle.includes(resolvedParams.q!.toLowerCase());
+      })
+    : typedListings;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="min-h-screen bg-slate-50">
+      {/* Top Brand Bar */}
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200">
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
+            <span className="font-black text-xl tracking-tight text-slate-900">
+              memycar<span className="text-blue-600">.com</span>
+            </span>
+            <span className="hidden sm:inline-block text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
+              UAE / GCC
+            </span>
+          </Link>
+
+          <Link
+            href="/sell"
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-sm transition"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <Plus className="w-4 h-4" />
+            Sell Your Car
+          </Link>
         </div>
+      </header>
+
+      {/* Hero / Filter Section */}
+      <section className="bg-white border-b border-slate-200 py-6 px-4">
+        <div className="max-w-6xl mx-auto space-y-4">
+          <div className="max-w-xl">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              Standardized car sales in the UAE.
+            </h1>
+            <p className="text-xs text-slate-500 mt-1">
+              Uniform 5-angle photography, verified specs, and direct WhatsApp contact. No clutter.
+            </p>
+          </div>
+
+          {/* Quick Filter Pills */}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Link
+              href="/"
+              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition ${
+                !resolvedParams.spec && !resolvedParams.emirate
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              All Listings
+            </Link>
+            <Link
+              href="/?spec=GCC"
+              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition ${
+                resolvedParams.spec === 'GCC'
+                  ? 'bg-emerald-600 text-white border-emerald-600'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              🇦🇪 GCC Specs Only
+            </Link>
+            <Link
+              href="/?emirate=Dubai"
+              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition ${
+                resolvedParams.emirate === 'Dubai'
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              Dubai
+            </Link>
+            <Link
+              href="/?emirate=Abu Dhabi"
+              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition ${
+                resolvedParams.emirate === 'Abu Dhabi'
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              Abu Dhabi
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Listings Grid */}
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        {filteredListings.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+            {filteredListings.map((car) => (
+              <ListingCard key={car.id} listing={car} />
+            ))}
+          </div>
+        ) : (
+          <div className="max-w-md mx-auto text-center py-16 px-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
+            <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-slate-900">No vehicles listed yet</h3>
+            <p className="text-xs text-slate-500 mt-1 mb-5">
+              Be the first to list a car on memycar.com with standardized angle photos.
+            </p>
+            <Link
+              href="/sell"
+              className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition"
+            >
+              <Plus className="w-4 h-4" />
+              List a Vehicle Now
+            </Link>
+          </div>
+        )}
       </main>
     </div>
   );
