@@ -55,4 +55,8 @@ export interface Listing {
   is_active?: boolean;
   created_at: string;
   updated_at?: string;
+  // New fields for service history
+  last_service_date?: string; // ISO date string
+  service_notes?: string;
+  service_record_urls?: string[]; // URLs to files in service-records bucket
 }

@@ -21,10 +21,15 @@ export default function ListingCard({ listing }: ListingCardProps) {
 
   const isGcc = listing.specs === 'GCC';
 
-  // WhatsApp link
-  const whatsappUrl = `https://wa.me/${listing.seller_whatsapp.replace(/[^\d]/g, '')}?text=${encodeURIComponent(
-    `I'm interested in your ${listing.year} ${listing.make} ${listing.model} ${listing.trim || ''}. Price: AED ${listing.price_aed.toLocaleString()}.`
-  )}`;
+  // WhatsApp link - handle possible missing or different field names
+  const phoneRaw = listing.seller_whatsapp || (listing as any).whatsapp_number || '';
+  const cleanPhone = phoneRaw.replace(/[^\d]/g, '');
+  const price = listing.price_aed ?? (listing as any).price ?? 0;
+  const whatsappUrl = cleanPhone
+    ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(
+        `I'm interested in your ${listing.year} ${listing.make} ${listing.model} ${listing.trim || ''}. Price: AED ${price.toLocaleString()}.`
+      )}`
+    : '#';
 
   return (
     <Link
@@ -74,7 +79,7 @@ export default function ListingCard({ listing }: ListingCardProps) {
         <div>
           <div className="flex justify-between items-baseline gap-2 mb-1">
             <span className="text-lg font-black text-slate-900 tracking-tight">
-              AED {Number(listing.price_aed).toLocaleString()}
+              AED {Number(price).toLocaleString()}
             </span>
             {/* WhatsApp Button */}
             <a
