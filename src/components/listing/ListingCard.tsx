@@ -21,6 +21,11 @@ export default function ListingCard({ listing }: ListingCardProps) {
 
   const isGcc = listing.specs === 'GCC';
 
+  // WhatsApp link
+  const whatsappUrl = `https://wa.me/${listing.seller_whatsapp.replace(/[^\d]/g, '')}?text=${encodeURIComponent(
+    `I'm interested in your ${listing.year} ${listing.make} ${listing.model} ${listing.trim || ''}. Price: AED ${listing.price_aed.toLocaleString()}.`
+  )}`;
+
   return (
     <Link
       href={`/listing/${listing.id}`}
@@ -41,8 +46,9 @@ export default function ListingCard({ listing }: ListingCardProps) {
           </div>
         )}
 
-        {/* Highlight Spec Badge */}
-        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+        {/* Badges: Specs, Year, City */}
+        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
+          {/* Specs Badge */}
           <span
             className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded shadow-sm ${
               isGcc
@@ -51,6 +57,14 @@ export default function ListingCard({ listing }: ListingCardProps) {
             }`}
           >
             {isGcc ? '🇦🇪 GCC' : listing.specs}
+          </span>
+          {/* Year Badge */}
+          <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900/20 text-slate-900 backdrop-blur-sm">
+            {listing.year}
+          </span>
+          {/* City Badge */}
+          <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900/20 text-slate-900 backdrop-blur-sm">
+            {listing.emirate}
           </span>
         </div>
       </div>
@@ -62,6 +76,15 @@ export default function ListingCard({ listing }: ListingCardProps) {
             <span className="text-lg font-black text-slate-900 tracking-tight">
               AED {Number(listing.price_aed).toLocaleString()}
             </span>
+            {/* WhatsApp Button */}
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl transition-shadow hover:shadow"
+            >
+              Chat Seller
+            </a>
           </div>
 
           <h3 className="font-bold text-slate-900 text-sm line-clamp-1 group-hover:text-blue-600 transition">
@@ -69,13 +92,19 @@ export default function ListingCard({ listing }: ListingCardProps) {
             {listing.trim ? <span className="font-normal text-slate-500 ml-1">{listing.trim}</span> : ''}
           </h3>
 
-          <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+          <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-2">
+            {/* Mileage */}
             <span>{Number(listing.mileage_km).toLocaleString()} km</span>
-            <span>•</span>
-            <span className="flex items-center gap-0.5">
-              <MapPin className="w-3 h-3 text-slate-400" />
-              {listing.emirate}
-            </span>
+            {/* Body Style */}
+            {listing.body_style ? (
+              <>
+                <span>•</span>
+                <span className="flex items-center gap-0.5">
+                  <Wrench className="w-3 h-3 text-slate-400" />
+                  {listing.body_style}
+                </span>
+              </>
+            ) : null}
           </div>
         </div>
 

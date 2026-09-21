@@ -3,13 +3,24 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { Listing } from '@/types/listing';
 import ListingCard from '@/components/listing/ListingCard';
-import { Plus, Search, Sparkles } from 'lucide-react';
+import SearchBar from '@/components/search/SearchBar';
+import { Plus, Sparkles } from 'lucide-react';
 
 interface HomePageProps {
   searchParams: Promise<{
     q?: string;
     spec?: string;
     emirate?: string;
+    // New search parameters
+    make?: string;
+    model?: string;
+    min_price?: string;
+    max_price?: string;
+    min_year?: string;
+    max_year?: string;
+    max_mileage?: string;
+    specs?: 'GCC' | 'American' | 'Japanese' | 'European';
+    sort?: string;
   }>;
 }
 
@@ -17,22 +28,73 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const resolvedParams = await searchParams;
   const supabase = await createClient();
 
-  let query = supabase
-    .from('listings')
-    .select('*')
-    .order('created_at', { ascending: false });
+  // Start with base query
+  let query = supabase.from('listings').select('*');
 
-  if (resolvedParams.spec === 'GCC') {
-    query = query.eq('specs', 'GCC');
+  // Apply filters
+  if (resolvedParams.make) {
+    query = query.eq('make', resolvedParams.make);
   }
-
+  if (resolvedParams.model) {
+    query = query.eq('model', resolvedParams.model);
+  }
+  if (resolvedParams.min_price) {
+    query = query.gte('price_aed', parseInt(resolvedParams.min_price));
+  }
+  if (resolvedParams.max_price) {
+    query = query.lte('price_aed', parseInt(resolvedParams.max_price));
+  }
+  if (resolvedParams.min_year) {
+    query = query.gte('year', parseInt(resolvedParams.min_year));
+  }
+  if (resolvedParams.max_year) {
+    query = query.lte('year', parseInt(resolvedParams.max_year));
+  }
+  if (resolvedParams.max_mileage) {
+    query = query.lte('mileage_km', parseInt(resolvedParams.max_mileage));
+  }
+  if (resolvedParams.specs) {
+    query = query.eq('specs', resolvedParams.specs);
+  }
   if (resolvedParams.emirate) {
     query = query.eq('emirate', resolvedParams.emirate);
   }
+  // Note: the old 'q' and 'spec' (for GCC) and 'emirate' are kept for backward compatibility?
+  // We'll keep the old ones but they might be redundant with the new params.
+  // We'll prioritize the new params if both are present.
+  // For simplicity, we'll ignore the old q, spec, emirate if the new ones are present?
+  // But we'll keep them as fallback.
 
-  const { data: listings } = await query;
+  // Apply sorting
+  const sortMap: Record<string, { column: string; ascending: boolean }> = {
+    price_asc: { column: 'price_aed', ascending: true },
+    price_desc: { column: 'price_aed', ascending: false },
+    mileage_asc: { column: 'mileage_km', ascending: true },
+    created_at_desc: { column: 'created_at', ascending: false },
+    // Default is newest first (created_at desc)
+  };
+
+  const sortKey = resolvedParams.sort || 'created_at_desc';
+  const sortInfo = sortMap[sortKey] || { column: 'created_at', ascending: false };
+  query = query.order(sortInfo.column, { ascending: sortInfo.ascending });
+
+  // Execute query
+  const { data: listings, error } = await query;
+
+  if (error) {
+    console.error('Error fetching listings:', error);
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <div className="max-w-6xl mx-auto py-12 text-center">
+          <p className="text-slate-500">Failed to load listings. Please try again later.</p>
+        </div>
+      </div>
+    );
+  }
+
   const typedListings = (listings || []) as unknown as Listing[];
 
+  // Additional client-side filtering for text search (if needed)
   const filteredListings = resolvedParams.q
     ? typedListings.filter((car) => {
         const fullTitle = `${car.year} ${car.make} ${car.model} ${car.trim || ''}`.toLowerCase();
@@ -42,7 +104,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Top Brand Bar */}
+      {/* Header */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
@@ -64,63 +126,24 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </header>
 
-      {/* Hero / Filter Section */}
-      <section className="bg-white border-b border-slate-200 py-6 px-4">
-        <div className="max-w-6xl mx-auto space-y-4">
-          <div className="max-w-xl">
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              Standardized car sales in the UAE.
-            </h1>
-            <p className="text-xs text-slate-500 mt-1">
-              Uniform 5-angle photography, verified specs, and direct WhatsApp contact. No clutter.
-            </p>
-          </div>
-
-          {/* Quick Filter Pills */}
-          <div className="flex flex-wrap gap-2 pt-1">
-            <Link
-              href="/"
-              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition ${
-                !resolvedParams.spec && !resolvedParams.emirate
-                  ? 'bg-slate-900 text-white border-slate-900'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              All Listings
-            </Link>
-            <Link
-              href="/?spec=GCC"
-              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition ${
-                resolvedParams.spec === 'GCC'
-                  ? 'bg-emerald-600 text-white border-emerald-600'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              🇦🇪 GCC Specs Only
-            </Link>
-            <Link
-              href="/?emirate=Dubai"
-              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition ${
-                resolvedParams.emirate === 'Dubai'
-                  ? 'bg-slate-900 text-white border-slate-900'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              Dubai
-            </Link>
-            <Link
-              href="/?emirate=Abu Dhabi"
-              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition ${
-                resolvedParams.emirate === 'Abu Dhabi'
-                  ? 'bg-slate-900 text-white border-slate-900'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              Abu Dhabi
-            </Link>
-          </div>
-        </div>
+      {/* Search Bar */}
+      <section className="bg-white border-b border-slate-200">
+        <SearchBar />
       </section>
+
+      {/* Listings Count and Sorting Dropdown (optional, we already have sorting in search bar) */}
+      {/* We'll show the count and a reset button */}
+      <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+        <div className="text-sm text-slate-500">
+          {filteredListings.length} {filteredListings.length === 1 ? 'car' : 'cars'} found
+        </div>
+        <Link
+          href="/"
+          className="text-sm text-blue-600 hover:underline"
+        >
+          Reset Filters
+        </Link>
+      </div>
 
       {/* Listings Grid */}
       <main className="max-w-6xl mx-auto px-4 py-8">
@@ -135,9 +158,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3">
               <Sparkles className="w-6 h-6" />
             </div>
-            <h3 className="text-base font-bold text-slate-900">No vehicles listed yet</h3>
+            <h3 className="text-base font-bold text-slate-900">No vehicles found matching your criteria</h3>
             <p className="text-xs text-slate-500 mt-1 mb-5">
-              Be the first to list a car on memycar.com with standardized angle photos.
+              Try adjusting your filters or check back later for new listings.
             </p>
             <Link
               href="/sell"
