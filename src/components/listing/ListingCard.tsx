@@ -33,7 +33,7 @@ export default function ListingCard({ listing }: ListingCardProps) {
   }
 
   // Call button phone number
-  const callPhoneRaw = listing.seller_phone || listing.whatsapp_number || '';
+  const callPhoneRaw = listing.seller_phone || (listing as any).whatsapp_number || '';
   const callUrl = callPhoneRaw ? `tel:${callPhoneRaw}` : '#';
 
   return (

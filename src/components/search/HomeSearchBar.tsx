@@ -102,7 +102,7 @@ export default function HomeSearchBar() {
                 {carData.makes.map((make) => (
                   <option key={make.make} value={make.make}>
                     {make.make}
-                  }
+                  </option>
                 ))}
               </select>
             </div>
@@ -120,7 +120,7 @@ export default function HomeSearchBar() {
                 {models.map((model) => (
                   <option key={model} value={model}>
                     {model}
-                  }
+                  </option>
                 ))}
               </select>
             </div>
@@ -137,7 +137,7 @@ export default function HomeSearchBar() {
                 {years.map((year) => (
                   <option key={year} value={year}>
                     {year}
-                  }
+                  </option>
                 ))}
               </select>
             </div>
@@ -154,7 +154,7 @@ export default function HomeSearchBar() {
                 {years.map((year) => (
                   <option key={year} value={year}>
                     {year}
-                  }
+                  </option>
                 ))}
               </select>
             </div>
@@ -171,7 +171,7 @@ export default function HomeSearchBar() {
                 {mileageIntervals.map((mileage) => (
                   <option key={mileage} value={mileage.toString()}>
                     {mileage >= 1000 ? `${mileage / 1000}k` : mileage}
-                  }
+                  </option>
                 ))}
               </select>
             </div>

@@ -2,27 +2,24 @@
 
 import { useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Listing, PhotoSlotKey } from '@/types/listing';
-import PhotoSlotUploader from '@/components/sell/PhotoSlotUploader';
-import StructuredSelector from '@/components/sell/StructuredSelector';
+import { carData, years } from '@/lib/constants/car-data';
+import { Listing, PhotoSlotKey, Emirate, VehicleSpec, ServiceHistory, PaintCondition, WarrantyStatus } from '@/types/listing';
 import { useRouter } from 'next/navigation';
+import PhotoSlotUploader from '@/components/sell/PhotoSlotUploader';
 
 // Define the vehicle form values type
 interface VehicleFormValues {
-  year: number | null;
   make: string | null;
   model: string | null;
-  trim: string | null;
-  spec: 'GCC' | 'American' | 'Japanese' | 'European' | null;
-  emirate: 'Dubai' | 'Abu Dhabi' | 'Sharjah' | 'Ajman' | 'Ras Al Khaimah' | 'Fujairah' | 'Umm Al Quwain' | null;
-  serviceHistory: 'Full Agency' | 'Regular/Specialist' | 'Partial/None' | null;
-  paintCondition: 'Original Paint' | 'Minor Touch-ups' | 'Repainted' | null;
-  warranty: 'Under Agency Warranty' | 'Dealer/Third-Party' | 'Expired/None' | null;
-  keysCount: 1 | 2 | null;
-  sellerName: string;
+  year: number | null;
+  price: number | null;
+  mileage: number | null;
+  specs: VehicleSpec | null;
+  emirate: Emirate | null;
+  transmission: string | null; // 'Automatic' | 'Manual'
+  fuel: string | null; // 'Petrol' | 'Hybrid' | 'Electric' | 'Diesel'
   sellerPhone: string;
-  description: string;
-  // New service history fields
+  // Service history fields
   lastServiceDate: string | null; // ISO date string
   serviceNotes: string | null;
 }
@@ -47,22 +44,18 @@ const SellPage: React.FC = () => {
 
     // Vehicle form values state
     vehicleForm: {
-      year: null,
-      make: null,
-      model: null,
-      trim: null,
-      spec: null,
-      emirate: null,
-      serviceHistory: null,
-      paintCondition: null,
-      warranty: null,
-      keysCount: null,
-      sellerName: '',
+      make: null as string | null,
+      model: null as string | null,
+      year: null as number | null,
+      price: null as number | null,
+      mileage: null as number | null,
+      specs: null as VehicleSpec | null,
+      emirate: null as Emirate | null,
+      transmission: null as string | null,
+      fuel: null as string | null,
       sellerPhone: '',
-      description: '',
-      // New service history fields
-      lastServiceDate: null,
-      serviceNotes: null
+      lastServiceDate: null as string | null,
+      serviceNotes: null as string | null
     }
   });
 
@@ -81,11 +74,22 @@ const SellPage: React.FC = () => {
     }));
   }, []);
 
-  // Handler for StructuredSelector
-  const handleVehicleFormChange = useCallback((vehicleForm: VehicleFormValues) => {
-    setFormState((prev) => ({
+  // Handler for service record files
+  const handleServiceRecordFilesChange = useCallback((files: File[]) => {
+    setFormState(prev => ({
       ...prev,
-      vehicleForm
+      serviceRecordFiles: files
+    }));
+  }, []);
+
+  // Handler for vehicle form changes
+  const handleVehicleFormChange = useCallback((vehicleForm: Partial<VehicleFormValues>) => {
+    setFormState(prev => ({
+      ...prev,
+      vehicleForm: {
+        ...prev.vehicleForm,
+        ...vehicleForm
+      }
     }));
   }, []);
 
@@ -101,10 +105,12 @@ const SellPage: React.FC = () => {
     }
 
     // Validate vehicle form data
-    const { year, make, model, sellerName, sellerPhone } = formState.vehicleForm;
-    if (!year || year < 1990 || year > 2027 ||
-        !make || !model ||
-        !sellerName || !sellerPhone.replace(/\s/g, '').length) {
+    const { make, model, year, price, mileage, specs, emirate, transmission, fuel, sellerPhone } = formState.vehicleForm;
+    if (!make || !model || !year || year < 1990 || year > 2027 ||
+        price === null || price < 0 ||
+        mileage === null || mileage < 0 ||
+        !specs || !emirate || !transmission || !fuel ||
+        !sellerPhone || !sellerPhone.replace(/\s/g, '').length) {
       setSubmitError('Please fill in all required fields correctly.');
       return;
     }
@@ -134,7 +140,7 @@ const SellPage: React.FC = () => {
           const filePath = `listings/${timestamp}_${key}.webp`;
           uploadPromises.push(
             supabase.storage
-              .from('car-media')
+              .from('car-photos')
               .upload(filePath, file, {
                 contentType: 'image/webp',
                 upsert: false
@@ -143,7 +149,7 @@ const SellPage: React.FC = () => {
                 if (error) throw error;
                 if (data) {
                   const { data: { publicUrl } } = supabase.storage
-                    .from('car-media')
+                    .from('car-photos')
                     .getPublicUrl(data.path);
                   photoUrls[key] = publicUrl;
                 }
@@ -159,7 +165,7 @@ const SellPage: React.FC = () => {
           const filePath = `listings/${timestamp}_extra_${index}.webp`;
           uploadPromises.push(
             supabase.storage
-              .from('car-media')
+              .from('car-photos')
               .upload(filePath, file, {
                 contentType: 'image/webp',
                 upsert: false
@@ -168,9 +174,33 @@ const SellPage: React.FC = () => {
                 if (error) throw error;
                 if (data) {
                   const { data: { publicUrl } } = supabase.storage
-                    .from('car-media')
+                    .from('car-photos')
                     .getPublicUrl(data.path);
                   extraPhotoUrls.push(publicUrl);
+                }
+              })
+          );
+        }
+      });
+
+      // Upload service record files
+      const serviceRecordUrls: string[] = [];
+      formState.serviceRecordFiles.forEach((file, index) => {
+        if (file) {
+          const filePath = `service-records/${timestamp}_${index}${file.name.substring(file.name.lastIndexOf('.'))}`;
+          uploadPromises.push(
+            supabase.storage
+              .from('service-records')
+              .upload(filePath, file, {
+                upsert: false
+              })
+              .then(({ data, error }) => {
+                if (error) throw error;
+                if (data) {
+                  const { data: { publicUrl } } = supabase.storage
+                    .from('service-records')
+                    .getPublicUrl(data.path);
+                  serviceRecordUrls.push(publicUrl);
                 }
               })
           );
@@ -181,28 +211,31 @@ const SellPage: React.FC = () => {
       await Promise.all(uploadPromises);
 
       // Prepare listing data matching src/types/listing.ts
-      const listingData: Omit<Listing, 'id' | 'created_at'> = {
-        title: `${formState.vehicleForm.year} ${formState.vehicleForm.make} ${formState.vehicleForm.model}${formState.vehicleForm.trim ? ` ${formState.vehicleForm.trim}` : ''}`,
+      const listingData: Omit<Listing, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'is_featured' | 'is_active'> = {
+        title: `${formState.vehicleForm.year} ${formState.vehicleForm.make} ${formState.vehicleForm.model}`,
         make: formState.vehicleForm.make!,
         model: formState.vehicleForm.model!,
         year: formState.vehicleForm.year!,
-        price_aed: 0, // TODO: Add price field to form
-        mileage_km: 0, // TODO: Add mileage field to form
-        specs: formState.vehicleForm.spec!,
+        price_aed: formState.vehicleForm.price!,
+        mileage_km: formState.vehicleForm.mileage!,
+        specs: formState.vehicleForm.specs!,
         emirate: formState.vehicleForm.emirate!,
-        body_style: 'Sedan', // Default - could be made configurable
-        service_history: formState.vehicleForm.serviceHistory!,
-        paint_condition: formState.vehicleForm.paintCondition!,
-        warranty: formState.vehicleForm.warranty!,
-        keys_count: formState.vehicleForm.keysCount!,
-        seller_name: formState.vehicleForm.sellerName,
+        body_style: `${formState.vehicleForm.transmission || ''} ${formState.vehicleForm.fuel || ''}`.trim(), // Store transmission and fuel in body_style
+        service_history: 'Regular/Specialist', // Default - could be made configurable
+        paint_condition: 'Original Paint', // Default
+        warranty: 'Expired/None', // Default
+        keys_count: 2, // Default
+        seller_name: '', // TODO: Add seller name field
         seller_phone: formState.vehicleForm.sellerPhone,
-        seller_whatsapp: formState.vehicleForm.sellerWhatsApp,
-        description: formState.vehicleForm.description,
+        seller_whatsapp: formState.vehicleForm.sellerPhone, // Use same as phone for now
+        description: formState.vehicleForm.serviceNotes || '', // Use service notes as description for now
         photos: {
           ...photoUrls,
           extra_photos: extraPhotoUrls
-        }
+        },
+        last_service_date: formState.vehicleForm.lastServiceDate ?? undefined,
+        service_notes: formState.vehicleForm.serviceNotes ?? undefined,
+        service_record_urls: serviceRecordUrls.length > 0 ? serviceRecordUrls : undefined
       };
 
       // Insert listing into database
@@ -240,26 +273,28 @@ const SellPage: React.FC = () => {
         odometer: null
       },
       extraPhotos: [],
+      serviceRecordFiles: [],
       vehicleForm: {
-        year: null,
-        make: null,
-        model: null,
-        trim: null,
-        spec: null,
-        emirate: null,
-        serviceHistory: null,
-        paintCondition: null,
-        warranty: null,
-        keysCount: null,
-        sellerName: '',
+        make: null as string | null,
+        model: null as string | null,
+        year: null as number | null,
+        price: null as number | null,
+        mileage: null as number | null,
+        specs: null as VehicleSpec | null,
+        emirate: null as Emirate | null,
+        transmission: null as string | null,
+        fuel: null as string | null,
         sellerPhone: '',
-        sellerWhatsApp: '+971 ',
-        description: ''
+        lastServiceDate: null as string | null,
+        serviceNotes: null as string | null
       }
     });
     setSubmitError(null);
     setSubmitSuccess(false);
   }, []);
+
+  // Get models for selected make
+  const models = formState.vehicleForm.make ? carData.makes.find(m => m.make === formState.vehicleForm.make)?.models || [] : [];
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -346,92 +381,219 @@ const SellPage: React.FC = () => {
               <p className="text-gray-600 mb-4">
                 Fill in your vehicle's specifications and contact information.
               </p>
-              <StructuredSelector
-                year={formState.vehicleForm.year}
-                make={formState.vehicleForm.make}
-                model={formState.vehicleForm.model}
-                trim={formState.vehicleForm.trim}
-                spec={formState.vehicleForm.spec}
-                emirate={formState.vehicleForm.emirate}
-                serviceHistory={formState.vehicleForm.serviceHistory}
-                paintCondition={formState.vehicleForm.paintCondition}
-                warranty={formState.vehicleForm.warranty}
-                keysCount={formState.vehicleForm.keysCount}
-                onYearChange={(value) => setFormState((prev) => ({
-  ...prev,
-  vehicleForm: {
-    ...prev.vehicleForm,
-    year: value
-  }
-}))}
-                onMakeChange={(value) => setFormState((prev) => ({
-  ...prev,
-  vehicleForm: {
-    ...prev.vehicleForm,
-    make: value
-  }
-}))}
-                onModelChange={(value) => setFormState((prev) => ({
-  ...prev,
-  vehicleForm: {
-    ...prev.vehicleForm,
-    model: value
-  }
-}))}
-                onTrimChange={(value) => setFormState((prev) => ({
-  ...prev,
-  vehicleForm: {
-    ...prev.vehicleForm,
-    trim: value
-  }
-}))}
-                onSpecChange={(value) => setFormState((prev) => ({
-  ...prev,
-  vehicleForm: {
-    ...prev.vehicleForm,
-    spec: value
-  }
-}))}
-                onEmirateChange={(value) => setFormState((prev) => ({
-  ...prev,
-  vehicleForm: {
-    ...prev.vehicleForm,
-    emirate: value
-  }
-}))}
-                onServiceHistoryChange={(value) => setFormState((prev) => ({
-  ...prev,
-  vehicleForm: {
-    ...prev.vehicleForm,
-    serviceHistory: value
-  }
-}))}
-                onPaintChange={(value) => setFormState((prev) => ({
-  ...prev,
-  vehicleForm: {
-    ...prev.vehicleForm,
-    paintCondition: value
-  }
-}))}
-                onWarrantyChange={(value) => setFormState((prev) => ({
-  ...prev,
-  vehicleForm: {
-    ...prev.vehicleForm,
-    warranty: value
-  }
-}))}
-                onKeysChange={(value) => setFormState((prev) => ({
-  ...prev,
-  vehicleForm: {
-    ...prev.vehicleForm,
-    keysCount: value
-  }
-}))}
-              />
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {/* Make */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Brand</label>
+                  <select
+                    value={formState.vehicleForm.make ?? ''}
+                    onChange={(e) => handleVehicleFormChange({ make: e.target.value || null })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+                  >
+                    <option value="">All Brands</option>
+                    {carData.makes.map((make) => (
+                      <option key={make.make} value={make.make}>
+                        {make.make}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Model */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Model</label>
+                  <select
+                    value={formState.vehicleForm.model ?? ''}
+                    onChange={(e) => handleVehicleFormChange({ model: e.target.value || null })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+                    disabled={!formState.vehicleForm.make}
+                  >
+                    <option value="">All Models</option>
+                    {models.map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Year */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Year</label>
+                  <select
+                    value={formState.vehicleForm.year?.toString() ?? ''}
+                    onChange={(e) => handleVehicleFormChange({ year: e.target.value ? parseInt(e.target.value, 10) : null })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+                  >
+                    <option value="">All Years</option>
+                    {years.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Price */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Price (AED)</label>
+                  <input
+                    type="number"
+                    value={formState.vehicleForm.price?.toString() ?? ''}
+                    onChange={(e) => handleVehicleFormChange({ price: e.target.value ? parseFloat(e.target.value) : null })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+                    placeholder="e.g. 50000"
+                  />
+                </div>
+
+                {/* Mileage */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Mileage (km)</label>
+                  <input
+                    type="number"
+                    value={formState.vehicleForm.mileage?.toString() ?? ''}
+                    onChange={(e) => handleVehicleFormChange({ mileage: e.target.value ? parseFloat(e.target.value) : null })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+                    placeholder="e.g. 50000"
+                  />
+                </div>
+
+                {/* Specs */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Specs</label>
+                  <select
+                    value={formState.vehicleForm.specs ?? ''}
+                    onChange={(e) => handleVehicleFormChange({ specs: e.target.value as VehicleSpec || null })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+                  >
+                    <option value="">All Specs</option>
+                    <option value="GCC">GCC Specs</option>
+                    <option value="American">American Specs</option>
+                    <option value="European">European Specs</option>
+                    <option value="Japanese">Japanese Specs</option>
+                  </select>
+                </div>
+
+                {/* City (Emirate) */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">City</label>
+                  <select
+                    value={formState.vehicleForm.emirate ?? ''}
+                    onChange={(e) => handleVehicleFormChange({ emirate: e.target.value as Emirate || null })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+                  >
+                    <option value="">All Cities</option>
+                    {['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain'].map((emirate) => (
+                      <option key={emirate} value={emirate}>
+                        {emirate}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Transmission */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Transmission</label>
+                  <select
+                    value={formState.vehicleForm.transmission ?? ''}
+                    onChange={(e) => handleVehicleFormChange({ transmission: e.target.value || null })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+                  >
+                    <option value="">All Transmissions</option>
+                    <option value="Automatic">Automatic</option>
+                    <option value="Manual">Manual</option>
+                  </select>
+                </div>
+
+                {/* Fuel */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Fuel Type</label>
+                  <select
+                    value={formState.vehicleForm.fuel ?? ''}
+                    onChange={(e) => handleVehicleFormChange({ fuel: e.target.value || null })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+                  >
+                    <option value="">All Fuel Types</option>
+                    <option value="Petrol">Petrol</option>
+                    <option value="Hybrid">Hybrid</option>
+                    <option value="Electric">Electric</option>
+                    <option value="Diesel">Diesel</option>
+                  </select>
+                </div>
+
+                {/* Seller Phone */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Seller Phone</label>
+                  <input
+                    type="tel"
+                    value={formState.vehicleForm.sellerPhone}
+                    onChange={(e) => handleVehicleFormChange({ sellerPhone: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+                    placeholder="+971 5x xxx xxx"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Service History Section */}
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                Step 3: Service History & Maintenance
+              </h2>
+              <p className="text-gray-600 mb-4">
+                Add service records to increase buyer confidence.
+              </p>
+              <div className="space-y-4">
+                {/* Last Service Date */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Last Service Date</label>
+                  <input
+                    type="date"
+                    value={formState.vehicleForm.lastServiceDate ?? ''}
+                    onChange={(e) => handleVehicleFormChange({ lastServiceDate: e.target.value || null })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+                  />
+                </div>
+
+                {/* Service Notes */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Service Notes</label>
+                  <textarea
+                    value={formState.vehicleForm.serviceNotes ?? ''}
+                    onChange={(e) => handleVehicleFormChange({ serviceNotes: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+                    placeholder="Detail recent services, brake jobs, major maintenance, warranty status..."
+                    rows={4}
+                  />
+                </div>
+
+                {/* Service Record Uploader */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Service Records (PDF, PNG, JPG)</label>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.png,.jpg,.jpeg"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      handleServiceRecordFilesChange(files);
+                    }}
+                    className="block w-full text-sm text-slate-500
+                       file:border-0 file:bg-transparent file:text-sm file:font-medium"
+                  />
+                  {formState.serviceRecordFiles.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs text-slate-500">
+                        {formState.serviceRecordFiles.length} file{formState.serviceRecordFiles.length !== 1 ? 's' : ''} selected
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Submit Button */}
-            <div className="pt-4">
+            <div className="pt-6">
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
@@ -453,17 +615,17 @@ const SellPage: React.FC = () => {
                 )}
               </button>
             </div>
-          </div>
 
-          {/* Reset Button */}
-          <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={handleReset}
-              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              Start Over
-            </button>
+            {/* Reset Button */}
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={handleReset}
+                className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                Start Over
+              </button>
+            </div>
           </div>
         </div>
       </div>

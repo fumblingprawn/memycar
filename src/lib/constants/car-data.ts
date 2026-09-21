@@ -37,7 +37,7 @@ export const carData = {
       make: 'Lexus',
       models: ['CT', 'ES', 'IS', 'GS', 'LS', 'NX', 'RX', 'GX', 'LX', 'UX', 'LC', 'RC']
     }
-  ] as const
+  ]
 };
 
 // Years range: current year down to 1990
