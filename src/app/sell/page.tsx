@@ -7,7 +7,7 @@ import PhotoSlotUploader from '@/components/sell/PhotoSlotUploader';
 import StructuredSelector from '@/components/sell/StructuredSelector';
 import { useRouter } from 'next/navigation';
 
-// Define the vehicle form values type based on StructuredSelector props
+// Define the vehicle form values type
 interface VehicleFormValues {
   year: number | null;
   make: string | null;
@@ -21,8 +21,10 @@ interface VehicleFormValues {
   keysCount: 1 | 2 | null;
   sellerName: string;
   sellerPhone: string;
-  sellerWhatsApp: string;
   description: string;
+  // New service history fields
+  lastServiceDate: string | null; // ISO date string
+  serviceNotes: string | null;
 }
 
 const SellPage: React.FC = () => {
@@ -40,6 +42,8 @@ const SellPage: React.FC = () => {
       odometer: null as File | null
     } as Record<PhotoSlotKey, File | null>,
     extraPhotos: [] as File[],
+    // Service record files state
+    serviceRecordFiles: [] as File[],
 
     // Vehicle form values state
     vehicleForm: {
@@ -55,9 +59,11 @@ const SellPage: React.FC = () => {
       keysCount: null,
       sellerName: '',
       sellerPhone: '',
-      sellerWhatsApp: '+971 ',
-      description: ''
-    } as VehicleFormValues
+      description: '',
+      // New service history fields
+      lastServiceDate: null,
+      serviceNotes: null
+    }
   });
 
   // UI state

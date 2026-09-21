@@ -21,15 +21,20 @@ export default function ListingCard({ listing }: ListingCardProps) {
 
   const isGcc = listing.specs === 'GCC';
 
-  // WhatsApp link - handle possible missing or different field names
-  const phoneRaw = listing.seller_whatsapp || (listing as any).whatsapp_number || '';
-  const cleanPhone = phoneRaw.replace(/[^\d]/g, '');
+  // Price for display
   const price = listing.price_aed ?? (listing as any).price ?? 0;
-  const whatsappUrl = cleanPhone
-    ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(
-        `I'm interested in your ${listing.year} ${listing.make} ${listing.model} ${listing.trim || ''}. Price: AED ${price.toLocaleString()}.`
-      )}`
-    : '#';
+
+  // Service indicator text
+  let serviceIndicatorText = '';
+  if (listing.last_service_date) {
+    const date = new Date(listing.last_service_date);
+    const options: Intl.DateTimeFormatOptions = { month: 'short', year: 'numeric' };
+    serviceIndicatorText = `Serviced: ${date.toLocaleDateString(undefined, options)}`;
+  }
+
+  // Call button phone number
+  const callPhoneRaw = listing.seller_phone || listing.whatsapp_number || '';
+  const callUrl = callPhoneRaw ? `tel:${callPhoneRaw}` : '#';
 
   return (
     <Link
@@ -81,15 +86,27 @@ export default function ListingCard({ listing }: ListingCardProps) {
             <span className="text-lg font-black text-slate-900 tracking-tight">
               AED {Number(price).toLocaleString()}
             </span>
-            {/* WhatsApp Button */}
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+            {/* Call Seller Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (callUrl) {
+                  window.location.href = callUrl;
+                }
+              }}
               className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl transition-shadow hover:shadow"
             >
-              Chat Seller
-            </a>
+              Call Seller
+            </button>
+            {/* Internal Chat Button (Coming Soon) */}
+            <button
+              disabled
+              className="flex items-center gap-1.5 bg-slate-400 text-white font-bold text-xs px-3 py-1.5 rounded-xl transition-shadow hover:shadow cursor-not-allowed"
+            >
+              Internal Chat (Coming Soon)
+            </button>
           </div>
 
           <h3 className="font-bold text-slate-900 text-sm line-clamp-1 group-hover:text-blue-600 transition">
@@ -125,6 +142,11 @@ export default function ListingCard({ listing }: ListingCardProps) {
             <span className="inline-flex items-center gap-1 text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded font-medium">
               <ShieldCheck className="w-3 h-3" />
               Warranty
+            </span>
+          )}
+          {serviceIndicatorText && (
+            <span className="mx-2 text-[10px] text-slate-500">
+              {serviceIndicatorText}
             </span>
           )}
           <span className="ml-auto text-[10px] text-slate-400">
