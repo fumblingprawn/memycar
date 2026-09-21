@@ -13,7 +13,12 @@ import {
   Gauge,
   Globe,
   Phone,
-  MessageCircle
+  MessageCircle,
+  ChevronsLeft,
+  ChevronsRight,
+  X,
+  ZoomIn,
+  ZoomOut
 } from 'lucide-react';
 
 interface ListingDetailPageProps {
@@ -80,6 +85,26 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
     `Hi ${typedListing.seller_name || 'there'}, I saw your ${typedListing.year} ${typedListing.make} ${typedListing.model} on memycar.com (${listingUrl}). Is it still available?`
   );
 
+  const [currentIndex, setCurrentIndex] = React.useState(0);
+  const [isLightboxOpen, setIsLightboxOpen] = React.useState(false);
+  const [isZoomed, setIsZoomed] = React.useState(false);
+
+  // Lightbox keyboard navigation
+  React.useEffect(() => {
+    if (!isLightboxOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsLightboxOpen(false);
+      } else if (e.key === 'ArrowLeft') {
+        setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+      } else if (e.key === 'ArrowRight') {
+        setCurrentIndex((prev) => (prev + 1) % images.length);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isLightboxOpen, images.length, currentIndex]);
+
   return (
     <div className="min-h-screen bg-slate-50 pb-28 sm:pb-16">
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200">
@@ -128,32 +153,57 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
         </div>
 
         <div className="bg-white rounded-2xl p-2 sm:p-3 shadow-sm border border-slate-200 mb-8">
-          <div className="relative aspect-[16/9] w-full rounded-xl overflow-hidden bg-slate-950">
-            {images.length > 0 ? (
-              <img
-                src={images[0]}
-                alt={`${typedListing.year} ${typedListing.make} ${typedListing.model}`}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm">
-                No preview image available
+          {/* Image Gallery with Lightbox */}
+          <div className="relative">
+            {/* Main Image */}
+            <div className="relative aspect-[16/9] w-full rounded-xl overflow-hidden bg-slate-950">
+              {images.length > 0 ? (
+                <>
+                  <img
+                    src={images[currentIndex]}
+                    alt={`${typedListing.year} ${typedListing.make} ${typedListing.model}}`}
+                    className="w-full h-full object-cover"
+                    onClick={() => setIsLightboxOpen(true)}
+                  />
+                  {/* Zoom Overlay Icon */}
+                  <button
+                    className="absolute top-2 right-2 p-1 rounded-full bg-white/50 hover:bg-white/700 transition-all"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsLightboxOpen(true);
+                    }}
+                  >
+                    <ZoomIn className="h-4 w-4 text-slate-900" />
+                  </button>
+                </>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm">
+                  No preview image available
+                </div>
+              )}
+            </div>
+
+            {/* Thumbnail Strip */}
+            {images.length > 1 && (
+              <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+                {images.map((url, index) => (
+                  <div
+                    key={index}
+                    className={`relative flex-shrink-0 w-24 aspect-[16/9] rounded-lg overflow-hidden border border-slate-200 ${
+                      currentIndex === index ? 'ring-2 ring-blue-500' : ''
+                    }`}
+                  >
+                    <img
+                      src={url}
+                      alt={`Angle ${index + 1}`}
+                      className="w-full h-full object-cover"
+                      onClick={() => setCurrentIndex(index)}
+                    />
+                  </div>
+                ))}
               </div>
             )}
           </div>
-
-          {images.length > 1 && (
-            <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
-              {images.map((url: string, index: number) => (
-                <div
-                  key={index}
-                  className="relative flex-shrink-0 w-24 aspect-[16/9] rounded-lg overflow-hidden border border-slate-200"
-                >
-                  <img src={url} alt={`Angle ${index + 1}`} className="w-full h-full object-cover" />
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -316,6 +366,70 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
           </div>
         </div>
       </main>
+
+      {/* Lightbox Modal */}
+      {isLightboxOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+          <div className="relative w-full max-w-[90vw] max-h-[90vh]">
+            {/* Lightbox Close Button */}
+            <button
+              className="absolute top-2 right-2 z-10 p-2 rounded-full bg-white/20 hover:bg-white/300 transition-all"
+              onClick={() => setIsLightboxOpen(false)}
+              aria-label="Close lightbox"
+            >
+              <X className="h-5 w-5 text-white" />
+            </button>
+
+            {/* Lightbox Navigation Arrows */}
+            <button
+              className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-white/20 hover:bg-white/300 transition-all disabled:opacity-20`}
+              onClick={() => setCurrentIndex((prev) => (prev - 1 + images.length) % images.length)}
+              disabled={images.length <= 1}
+              aria-label="Previous image"
+            >
+              <ChevronsLeft className="h-5 w-5 text-white" />
+            </button>
+            <button
+              className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-white/20 hover:bg-white/300 transition-all disabled:opacity-20`}
+              onClick={() => setCurrentIndex((prev) => (prev + 1) % images.length)}
+              disabled={images.length <= 1}
+              aria-label="Next image"
+            >
+              <ChevronsRight className="h-5 w-5 text-white" />
+            </button>
+
+            {/* Lightbox Image with Zoom Toggle */}
+            <div
+              className={`relative w-full h-full flex items-center justify-center ${isZoomed ? 'overflow-auto' : 'overflow-hidden'}`}
+              onDoubleClick={() => setIsZoomed((prev) => !prev)}
+            >
+              <img
+                src={images[currentIndex]}
+                alt={`${typedListing.year} ${typedListing.make} ${typedListing.model}}`}
+                className={`${isZoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'} transition-transform
+                ${isZoomed ? 'max-none' : 'max-w-full max-h-full'} object-contain`}
+                onClick={() => setIsZoomed((prev) => !prev)}
+              />
+            </div>
+
+            {/* Zoom Toggle Button */}
+            <button
+              className="absolute bottom-2 right-2 z-10 p-2 rounded-full bg-white/20 hover:bg-white/300 transition-all"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsZoomed((prev) => !prev);
+              }}
+              aria-label={isZoomed ? 'Zoom out' : 'Zoom in'}
+            >
+              {isZoomed ? (
+                <ZoomOut className="h-5 w-5 text-white" />
+              ) : (
+                <ZoomIn className="h-5 w-5 text-white" />
+              )}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-3 shadow-lg">
         <div className="max-w-md mx-auto flex items-center gap-3">

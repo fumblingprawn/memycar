@@ -10,14 +10,24 @@ interface ListingCardProps {
 }
 
 export default function ListingCard({ listing }: ListingCardProps) {
-  let heroImage = '';
+  // Fallback chain for primary image
+  const primaryImage =
+    (Array.isArray((listing as any).image_urls) && (listing as any).image_urls.length > 0 && (listing as any).image_urls[0]) ||
+    (Array.isArray((listing as any).images) && (listing as any).images.length > 0 && (listing as any).images[0]) ||
+    ((listing as any).image_url) ||
+    ((listing as any).photos?.front_three_quarter) ||
+    '/placeholder-car.jpg';
 
-  if (listing.photos && typeof listing.photos === 'object') {
-    heroImage = (listing.photos as Record<string, any>).front_three_quarter;
-    if (!heroImage && Array.isArray((listing.photos as any).extra_photos)) {
-      heroImage = (listing.photos as any).extra_photos[0] || '';
-    }
-  }
+  // Generate a gray SVG placeholder for onError
+  const getGrayPlaceholder = () => {
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="400" height="225">
+        <rect width="400" height="225" fill="#ddd"/>
+        <text x="50%" y="50%" fill="#999" dominant-baseline="middle" text-anchor="middle">No Image</text>
+      </svg>
+    `;
+    return `data:image/svg+xml;base64,${window.btoa(svg)}`;
+  };
 
   const isGcc = listing.specs === 'GCC';
 
@@ -43,12 +53,16 @@ export default function ListingCard({ listing }: ListingCardProps) {
     >
       {/* 16:9 Standardized Hero Image Container */}
       <div className="relative aspect-[16/9] w-full bg-slate-900 overflow-hidden">
-        {heroImage ? (
+        {primaryImage ? (
           <img
-            src={heroImage}
+            src={primaryImage}
             alt={`${listing.year} ${listing.make} ${listing.model}`}
             className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
             loading="lazy"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.src = getGrayPlaceholder();
+            }}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
