@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { carData, years } from '@/lib/constants/car-data';
+import { Search, ChevronDown } from 'lucide-react';
 
 export default function HomeSearchBar() {
   const router = useRouter();
@@ -44,67 +45,100 @@ export default function HomeSearchBar() {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-md p-4 sm:p-6 border border-slate-200">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Make */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">Make</label>
-          <select
-            value={make}
-            onChange={(e) => handleMakeChange(e.target.value)}
-            className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="">All Makes</option>
-            {carData.makes.map((item) => (
-              <option key={item.make} value={item.make}>
-                {item.make}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Model */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">Model</label>
-          <select
-            value={model}
-            disabled={!make}
-            onChange={(e) => setModel(e.target.value)}
-            className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white disabled:bg-slate-100 focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="">{make ? 'All Models' : 'Select Make First'}</option>
-            {availableModels.map((mod) => (
-              <option key={mod} value={mod}>
-                {mod}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Min Year */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">Min Year</label>
-          <select
-            value={minYear}
-            onChange={(e) => setMinYear(e.target.value)}
-            className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="">Any Year</option>
-            {years.map((yr) => (
-              <option key={yr} value={yr.toString()}>{yr}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Search CTA */}
-        <div className="flex items-end">
-          <button
-            type="button"
-            onClick={handleSearch}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg transition"
-          >
-            Search Cars
-          </button>
+    <div className="bg-white rounded-3xl shadow-lg border border-slate-100">
+      <div className="px-6 py-8">
+        <h2 className="mb-6 text-2xl font-bold text-gray-900 text-center">
+          Find Your Perfect Car
+        </h2>
+        <div className="grid gap-6">
+          {/* Row 1: Make and Model */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <Search className="h-4 w-4 text-blue-500" />
+                Make
+              </label>
+              <select
+                value={make}
+                onChange={(e) => handleMakeChange(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all hover:border-slate-300"
+              >
+                <option value="">All Makes</option>
+                {carData.makes.map((item) => (
+                  <option key={item.make} value={item.make}>
+                    {item.make}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <Search className="h-4 w-4 text-blue-500" />
+                Model
+              </label>
+              <select
+                value={model}
+                disabled={!make}
+                onChange={(e) => setModel(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all hover:border-slate-300"
+              >
+                <option value="">{make ? 'All Models' : 'Select Make First'}</option>
+                {availableModels.map((mod) => (
+                  <option key={mod} value={mod}>
+                    {mod}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          
+          {/* Row 2: Year and Price */}
+          <div className="gap-4 sm:grid-cols-2">
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <Search className="h-4 w-4 text-blue-500" />
+                Min Year
+              </label>
+              <select
+                value={minYear}
+                onChange={(e) => setMinYear(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all hover:border-slate-300"
+              >
+                <option value="">Any Year</option>
+                {years.map((yr) => (
+                  <option key={yr} value={yr.toString()}>
+                    {yr}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <Search className="h-4 w-4 text-blue-500" />
+                Max Price (AED)
+              </label>
+              <input
+                type="number"
+                placeholder="e.g. 200000"
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all hover:border-slate-300"
+              />
+            </div>
+          </div>
+          
+          {/* Search Button */}
+          <div className="flex justify-center">
+            <button
+              onClick={handleSearch}
+              className="flex-1 sm:w-48 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-all hover:shadow-lg transform hover:-translate-y-1 flex items-center justify-center gap-2"
+            >
+              <Search className="h-4 w-4" />
+              Search Cars
+            </button>
+          </div>
         </div>
       </div>
     </div>

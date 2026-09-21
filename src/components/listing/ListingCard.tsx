@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { Listing, PhotoSlotKey } from '@/types/listing';
-import { MapPin, ShieldCheck, Wrench } from 'lucide-react';
+import { MapPin, ShieldCheck, Wrench, Globe } from 'lucide-react';
 
 interface ListingCardProps {
   listing: Listing;
@@ -46,18 +46,22 @@ export default function ListingCard({ listing }: ListingCardProps) {
   const callPhoneRaw = listing.seller_phone || (listing as any).whatsapp_number || '';
   const callUrl = callPhoneRaw ? `tel:${callPhoneRaw}` : '#';
 
+  // Pre-compute boolean values to avoid TypeScript narrowing issues
+  const isFullAgency = listing.service_history === 'Full Agency';
+  const isUnderWarranty = listing.warranty === 'Under Agency Warranty';
+
   return (
     <Link
       href={`/listing/${listing.id}`}
-      className="group bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition duration-200 flex flex-col"
+      className="group block rounded-3xl border border-slate-100 overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white"
     >
       {/* 16:9 Standardized Hero Image Container */}
-      <div className="relative aspect-[16/9] w-full bg-slate-900 overflow-hidden">
+      <div className="relative aspect-[16/9] w-full bg-slate-50 overflow-hidden">
         {primaryImage ? (
           <img
             src={primaryImage}
             alt={`${listing.year} ${listing.make} ${listing.model}`}
-            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             loading="lazy"
             onError={(e) => {
               const target = e.target as HTMLImageElement;
@@ -71,10 +75,10 @@ export default function ListingCard({ listing }: ListingCardProps) {
         )}
 
         {/* Badges: Specs, Year, City */}
-        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
+        <div className="absolute top-3 left-3 flex flex-col gap-2">
           {/* Specs Badge */}
           <span
-            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded shadow-sm ${
+            className={`text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-sm ${
               isGcc
                 ? 'bg-emerald-600 text-white'
                 : 'bg-slate-900/80 text-white backdrop-blur-sm'
@@ -83,26 +87,107 @@ export default function ListingCard({ listing }: ListingCardProps) {
             {isGcc ? '🇦🇪 GCC' : listing.specs}
           </span>
           {/* Year Badge */}
-          <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900/20 text-slate-900 backdrop-blur-sm">
+          <span className="text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm bg-slate-900/20 text-slate-900 backdrop-blur-sm">
             {listing.year}
           </span>
           {/* City Badge */}
-          <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900/20 text-slate-900 backdrop-blur-sm">
+          <span className="text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm bg-slate-900/20 text-slate-900 backdrop-blur-sm">
             {listing.emirate}
           </span>
         </div>
       </div>
 
       {/* Card Body */}
-      <div className="p-4 flex-1 flex flex-col justify-between">
-        <div>
-          <div className="flex justify-between items-baseline gap-2 mb-1">
-            <span className="text-lg font-black text-slate-900 tracking-tight">
-              AED {Number(price).toLocaleString()}
-            </span>
-            {/* Call Seller Button */}
+      <div className="p-6 pt-0">
+        <div className="mb-4">
+          <div className="flex justify-between items-start mb-2">
+            <div className="flex-1">
+              <h3 className="mb-1 text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                {listing.year} {listing.make} {listing.model}
+                {listing.trim ? <span className="ml-2 text-xs font-medium text-gray-500">{listing.trim}</span> : ''}
+              </h3>
+              <p className="text-sm text-gray-500 truncate">
+                {listing.body_style || ''}
+              </p>
+            </div>
+            <div className="flex items-center space-x-3">
+              <span className="text-2xl font-bold text-blue-600">
+                AED {Number(price).toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="text-sm text-gray-600 flex flex-wrap gap-4">
+            {/* Mileage */}
+            <div className="flex items-center gap-1">
+              <Wrench className="h-3 w-3 text-gray-400" />
+              <span>{Number(listing.mileage_km).toLocaleString()} km</span>
+            </div>
+            
+            {/* Body Style */}
+            {listing.body_style && (
+              <>
+                <span className="w-0.5 bg-gray-300"></span>
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3 text-gray-400" />
+                  <span>{listing.body_style}</span>
+                </span>
+              </>
+            )}
+          </div>
+          
+          <div className="text-sm text-gray-600 flex flex-wrap gap-4">
+            {/* Specs */}
+            <div className="flex items-center gap-1">
+              <Globe className="h-3 w-3 text-gray-400" />
+              <span>{listing.specs}</span>
+            </div>
+            
+            {/* Service History */}
+            {isFullAgency && (
+              <>
+                <span className="w-0.5 bg-gray-300"></span>
+                <span className="flex items-center gap-1">
+                  <ShieldCheck className="h-3 w-3 text-blue-600" />
+                  <span>{listing.service_history}</span>
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+        
+        {isFullAgency || isUnderWarranty && (
+          <div className="mt-4 pt-3 border-t border-slate-100">
+            <div className="flex items-center gap-3 text-sm">
+              {isFullAgency && (
+                <span className="px-3 py-1 bg-blue-50 text-blue-800 text-xs rounded">
+                  <ShieldCheck className="h-3 w-3 mr-1" /> Full Agency Service
+                </span>
+              )}
+              {isUnderWarranty && (
+                <span className="px-3 py-1 bg-green-50 text-green-800 text-xs rounded">
+                  <Wrench className="h-3 w-3 mr-1" /> Under Warranty
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {listing.description && (
+          <div className="mt-4">
+            <p className="text-sm text-gray-600 line-clamp-2">{listing.description}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Card Footer */}
+      <div className="pt-5 pb-4">
+        <div className="flex justify-between items-center">
+          {/* Call Seller Button */}
+          {callUrl && (
             <button
-              type="button"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -110,62 +195,19 @@ export default function ListingCard({ listing }: ListingCardProps) {
                   window.location.href = callUrl;
                 }
               }}
-              className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl transition-shadow hover:shadow"
+              className="flex-1 flex items-center justify-center bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-all hover:shadow-lg transform hover:-translate-y-1"
             >
               Call Seller
             </button>
-            {/* Internal Chat Button (Coming Soon) */}
-            <button
-              disabled
-              className="flex items-center gap-1.5 bg-slate-400 text-white font-bold text-xs px-3 py-1.5 rounded-xl transition-shadow hover:shadow cursor-not-allowed"
-            >
-              Internal Chat (Coming Soon)
-            </button>
-          </div>
-
-          <h3 className="font-bold text-slate-900 text-sm line-clamp-1 group-hover:text-blue-600 transition">
-            {listing.year} {listing.make} {listing.model}
-            {listing.trim ? <span className="font-normal text-slate-500 ml-1">{listing.trim}</span> : ''}
-          </h3>
-
-          <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-2">
-            {/* Mileage */}
-            <span>{Number(listing.mileage_km).toLocaleString()} km</span>
-            {/* Body Style */}
-            {listing.body_style ? (
-              <>
-                <span>•</span>
-                <span className="flex items-center gap-0.5">
-                  <Wrench className="w-3 h-3 text-slate-400" />
-                  {listing.body_style}
-                </span>
-              </>
-            ) : null}
-          </div>
-        </div>
-
-        {/* Micro Badges Footer */}
-        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100 text-[11px] text-slate-600">
-          {listing.service_history === 'Full Agency' && (
-            <span className="inline-flex items-center gap-1 text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded font-medium">
-              <Wrench className="w-3 h-3" />
-              Agency
-            </span>
           )}
-          {listing.warranty === 'Under Agency Warranty' && (
-            <span className="inline-flex items-center gap-1 text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded font-medium">
-              <ShieldCheck className="w-3 h-3" />
-              Warranty
-            </span>
-          )}
-          {serviceIndicatorText && (
-            <span className="mx-2 text-[10px] text-slate-500">
-              {serviceIndicatorText}
-            </span>
-          )}
-          <span className="ml-auto text-[10px] text-slate-400">
-            {listing.keys_count === 2 ? '2 Keys' : '1 Key'}
-          </span>
+          
+          {/* Internal Chat Button (Coming Soon) */}
+          <button
+            disabled
+            className="flex-1 flex items-center justify-center bg-slate-200 hover:bg-slate-300 text-gray-500 font-medium py-2 px-4 rounded-lg transition-all"
+          >
+            Internal Chat (Coming Soon)
+          </button>
         </div>
       </div>
     </Link>
