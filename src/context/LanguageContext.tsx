@@ -2,67 +2,63 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-
-type Locale = 'en' | 'ar';
-type Direction = 'ltr' | 'rtl';
+import { Locale, t as translateHelper, formatPrice, formatMileage } from '@/lib/i18n';
 
 interface LanguageContextType {
   locale: Locale;
-  dir: Direction;
+  dir: 'ltr' | 'rtl';
+  isAr: boolean;
   toggleLanguage: () => void;
-  setLocaleDirect: (lang: Locale) => void;
+  t: (key: string) => string;
+  formatPrice: (amount: number | string) => string;
+  formatMileage: (km: number | string) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType>({
   locale: 'en',
   dir: 'ltr',
+  isAr: false,
   toggleLanguage: () => {},
-  setLocaleDirect: () => {},
+  t: (k) => k,
+  formatPrice: (a) => `AED ${a}`,
+  formatMileage: (m) => `${m} km`,
 });
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocale] = useState<Locale>('en');
   const router = useRouter();
 
-  // Read initial locale on mount
   useEffect(() => {
     const saved = localStorage.getItem('memycar_lang') as Locale | null;
     if (saved === 'en' || saved === 'ar') {
       setLocale(saved);
       document.documentElement.lang = saved;
       document.documentElement.dir = saved === 'ar' ? 'rtl' : 'ltr';
-      document.cookie = `NEXT_LOCALE=${saved}; path=/; max-age=31536000`;
     }
   }, []);
 
-  const applyLocale = useCallback((next: Locale) => {
-    setLocale(next);
-    localStorage.setItem('memycar_lang', next);
-    document.cookie = `NEXT_LOCALE=${next}; path=/; max-age=31536000`;
-    document.documentElement.lang = next;
-    document.documentElement.dir = next === 'ar' ? 'rtl' : 'ltr';
-
-    // Broadcast across the window so all components update without reload
-    window.dispatchEvent(new CustomEvent('memycar_locale_change', { detail: next }));
-    router.refresh();
-  }, [router]);
-
   const toggleLanguage = useCallback(() => {
     const next: Locale = locale === 'en' ? 'ar' : 'en';
-    applyLocale(next);
-  }, [locale, applyLocale]);
-
-  const setLocaleDirect = useCallback((next: Locale) => {
-    applyLocale(next);
-  }, [applyLocale]);
+    setLocale(next);
+    localStorage.setItem('memycar_lang', next);
+    document.documentElement.lang = next;
+    document.documentElement.dir = next === 'ar' ? 'rtl' : 'ltr';
+    
+    // Broadcast for immediate child sync
+    window.dispatchEvent(new CustomEvent('memycar_locale_change', { detail: next }));
+    router.refresh();
+  }, [locale, router]);
 
   return (
     <LanguageContext.Provider
       value={{
         locale,
         dir: locale === 'ar' ? 'rtl' : 'ltr',
+        isAr: locale === 'ar',
         toggleLanguage,
-        setLocaleDirect,
+        t: (key: string) => translateHelper(key, locale),
+        formatPrice: (amt) => formatPrice(amt, locale),
+        formatMileage: (km) => formatMileage(km, locale),
       }}
     >
       {children}

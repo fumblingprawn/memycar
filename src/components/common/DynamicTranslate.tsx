@@ -16,10 +16,30 @@ export default function DynamicTranslate({
   as: Component = 'span',
   className = '',
 }: DynamicTranslateProps) {
-  const { locale } = useLanguage();
+  const { locale: contextLocale } = useLanguage();
   const rawText = (text || '').trim();
+  const [currentLocale, setCurrentLocale] = useState(contextLocale);
   const [displayText, setDisplayText] = useState(rawText);
   const [loading, setLoading] = useState(false);
+
+  // Sync with context changes and custom window broadcast
+  useEffect(() => {
+    setCurrentLocale(contextLocale);
+  }, [contextLocale]);
+
+  useEffect(() => {
+    const handleLocaleChange = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail) {
+        setCurrentLocale(customEvent.detail as 'en' | 'ar');
+      }
+    };
+
+    window.addEventListener('memycar_locale_change', handleLocaleChange);
+    return () => {
+      window.removeEventListener('memycar_locale_change', handleLocaleChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (!rawText) {
@@ -27,13 +47,13 @@ export default function DynamicTranslate({
       return;
     }
 
-    // When English is selected, revert immediately to raw text
-    if (locale === 'en') {
+    // Revert immediately to English when switched back
+    if (currentLocale === 'en') {
       setDisplayText(rawText);
       return;
     }
 
-    const cacheKey = `${locale}:${rawText}`;
+    const cacheKey = `${currentLocale}:${rawText}`;
     if (translationCache.has(cacheKey)) {
       setDisplayText(translationCache.get(cacheKey)!);
       return;
@@ -47,7 +67,7 @@ export default function DynamicTranslate({
         const res = await fetch('/api/translate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: rawText, targetLang: locale }),
+          body: JSON.stringify({ text: rawText, targetLang: currentLocale }),
         });
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -70,7 +90,7 @@ export default function DynamicTranslate({
     return () => {
       isMounted = false;
     };
-  }, [rawText, locale]);
+  }, [rawText, currentLocale]);
 
   return (
     <Component className={`${className} ${loading ? 'opacity-60 animate-pulse' : 'transition-opacity duration-200'}`}>

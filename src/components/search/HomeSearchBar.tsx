@@ -7,8 +7,7 @@ import { useLanguage } from '@/context/LanguageContext';
 
 export default function HomeSearchBar() {
   const router = useRouter();
-  const { locale } = useLanguage();
-  const isAr = locale === 'ar';
+  const { t } = useLanguage();
 
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
@@ -25,15 +24,7 @@ export default function HomeSearchBar() {
     ? carData.makes.find((m) => m.make.toLowerCase() === make.toLowerCase())?.models || []
     : [];
 
-  const emirates = [
-    { en: 'Dubai', ar: 'دبي' },
-    { en: 'Abu Dhabi', ar: 'أبوظبي' },
-    { en: 'Sharjah', ar: 'الشارقة' },
-    { en: 'Ajman', ar: 'عجمان' },
-    { en: 'Ras Al Khaimah', ar: 'رأس الخيمة' },
-    { en: 'Fujairah', ar: 'الفجيرة' },
-    { en: 'Umm Al Quwain', ar: 'أم القيوين' },
-  ];
+  const emiratesList = ['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain'];
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,9 +62,7 @@ export default function HomeSearchBar() {
         {/* Line 1: Make & Model */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
-              {isAr ? 'الماركة' : 'Make'}
-            </label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">{t('make')}</label>
             <select
               value={make}
               onChange={(e) => {
@@ -82,24 +71,24 @@ export default function HomeSearchBar() {
               }}
               className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14]"
             >
-              <option value="">{isAr ? 'جميع الماركات' : 'All Makes'}</option>
+              <option value="">{t('allMakes')}</option>
               {carData.makes.map((item) => (
-                <option key={item.make} value={item.make}>{item.make}</option>
+                <option key={item.make} value={item.make}>
+                  {t(item.make)}
+                </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
-              {isAr ? 'الموديل' : 'Model'}
-            </label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">{t('model')}</label>
             <select
               disabled={!make}
               value={model}
               onChange={(e) => setModel(e.target.value)}
               className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white disabled:bg-slate-100 outline-none focus:ring-2 focus:ring-[#e03a14]"
             >
-              <option value="">{isAr ? 'جميع الموديلات' : 'All Models'}</option>
+              <option value="">{t('allModels')}</option>
               {availableModels.map((mod) => (
                 <option key={mod} value={mod}>{mod}</option>
               ))}
@@ -110,9 +99,7 @@ export default function HomeSearchBar() {
         {/* Line 2: Year */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
-              {isAr ? 'من سنة' : 'Year from'}
-            </label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">{t('yearFrom')}</label>
             <select
               value={yearFrom}
               onChange={(e) => setYearFrom(e.target.value)}
@@ -125,9 +112,7 @@ export default function HomeSearchBar() {
             </select>
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
-              {isAr ? 'إلى سنة' : 'Year to'}
-            </label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">{t('yearTo')}</label>
             <select
               value={yearTo}
               onChange={(e) => setYearTo(e.target.value)}
@@ -144,9 +129,7 @@ export default function HomeSearchBar() {
         {/* Line 3: Mileage */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
-              {isAr ? 'المسافة من (كم)' : 'Mileage from'}
-            </label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">{t('mileageFrom')}</label>
             <input
               type="number"
               placeholder="0"
@@ -156,9 +139,7 @@ export default function HomeSearchBar() {
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
-              {isAr ? 'المسافة إلى (كم)' : 'Mileage to'}
-            </label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">{t('mileageTo')}</label>
             <input
               type="number"
               placeholder="200,000"
@@ -172,9 +153,7 @@ export default function HomeSearchBar() {
         {/* Line 4: Price */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
-              {isAr ? 'السعر من (درهم)' : 'Price from'}
-            </label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">{t('priceFrom')}</label>
             <input
               type="number"
               placeholder="0"
@@ -184,9 +163,7 @@ export default function HomeSearchBar() {
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
-              {isAr ? 'السعر إلى (درهم)' : 'Price to'}
-            </label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">{t('priceTo')}</label>
             <input
               type="number"
               placeholder="500,000"
@@ -200,52 +177,50 @@ export default function HomeSearchBar() {
         {/* Line 5: Emirate & Specs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
-              {isAr ? 'الإمارة / المدينة' : 'Emirate'}
-            </label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">{t('emirate')}</label>
             <select
               value={emirate}
               onChange={(e) => setEmirate(e.target.value)}
               className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
             >
-              <option value="">{isAr ? 'جميع الإمارات' : 'All Emirates'}</option>
-              {emirates.map((em) => (
-                <option key={em.en} value={em.en}>{isAr ? em.ar : em.en}</option>
+              <option value="">{t('allEmirates')}</option>
+              {emiratesList.map((em) => (
+                <option key={em} value={em}>{t(em)}</option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
-              {isAr ? 'المواصفات الإقليمية' : 'Regional Specs'}
-            </label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">{t('specs')}</label>
             <select
               value={specs}
               onChange={(e) => setSpecs(e.target.value)}
               className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
             >
-              <option value="">{isAr ? 'جميع المواصفات' : 'All Specs'}</option>
-              <option value="GCC">{isAr ? 'مواصفات خليجية' : 'GCC Specs'}</option>
-              <option value="Non-GCC">{isAr ? 'وارد (غير خليجي)' : 'Non-GCC'}</option>
+              <option value="">{t('allSpecs')}</option>
+              <option value="GCC Specs">{t('GCC Specs')}</option>
+              <option value="American Specs">{t('American Specs')}</option>
+              <option value="Japanese Specs">{t('Japanese Specs')}</option>
+              <option value="European Specs">{t('European Specs')}</option>
             </select>
           </div>
         </div>
 
-        {/* Buttons */}
+        {/* Action Buttons */}
         <div className="pt-2 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={handleReset}
             className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
           >
-            {isAr ? 'إعادة تعيين' : 'Reset'}
+            {t('reset')}
           </button>
 
           <button
             type="submit"
             className="bg-[#e03a14] hover:bg-[#c53210] text-white font-bold py-3 px-6 rounded-xl text-sm transition flex-1 sm:flex-none shadow-sm"
           >
-            {isAr ? 'ابحث عن سيارة' : 'Search Cars'}
+            {t('searchCars')}
           </button>
         </div>
       </form>
