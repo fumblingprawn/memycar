@@ -1,658 +1,395 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { carData, years } from '@/lib/constants/car-data';
-import { PhotoSlotKey, Emirate, VehicleSpec, ServiceHistory, PaintCondition, WarrantyStatus } from '@/types/listing';
-import { useRouter } from 'next/navigation';
-import PhotoSlotUploader from '@/components/sell/PhotoSlotUploader';
-import { useLanguage } from '@/context/LanguageContext';
+import { UploadCloud, CheckCircle2, ChevronRight, Car, Camera, FileText, User } from 'lucide-react';
 
-interface VehicleFormValues {
-  year: number | null;
-  make: string | null;
-  model: string | null;
-  trim: string | null;
-  price: number | null;
-  mileage: number | null;
-  spec: VehicleSpec | string | null;
-  emirate: Emirate | string | null;
-  serviceHistory: ServiceHistory | string | null;
-  paintCondition: PaintCondition | string | null;
-  warranty: WarrantyStatus | string | null;
-  keysCount: 1 | 2 | null;
-  sellerName: string;
-  sellerPhone: string;
-  description: string;
-  descriptionEn: string | null;
-  descriptionAr: string | null;
-  lastServiceDate: string | null;
-  serviceNotes: string | null;
-  serviceNotesEn: string | null;
-  serviceNotesAr: string | null;
-  primaryLanguage: 'en' | 'ar';
-}
-
-interface SellPageState {
-  photoSlots: Record<PhotoSlotKey, File | null>;
-  extraPhotos: File[];
-  serviceRecordFiles: File[];
-  vehicleForm: VehicleFormValues;
-}
-
-const initialVehicleForm: VehicleFormValues = {
-  year: null,
-  make: null,
-  model: null,
-  trim: null,
-  price: null,
-  mileage: null,
-  spec: 'GCC',
-  emirate: 'Dubai',
-  serviceHistory: 'Full Agency',
-  paintCondition: 'Original Paint',
-  warranty: 'Under Agency Warranty',
-  keysCount: 2,
-  sellerName: '',
-  sellerPhone: '',
-  description: '',
-  descriptionEn: null,
-  descriptionAr: null,
-  lastServiceDate: null,
-  serviceNotes: '',
-  serviceNotesEn: null,
-  serviceNotesAr: null,
-  primaryLanguage: 'en',
-};
-
-const SellPage: React.FC = () => {
+export default function SellPage() {
   const router = useRouter();
   const supabase = createClient();
-  const { locale, toggleLocale } = useLanguage();
 
-  const [state, setState] = useState<SellPageState>({
-    photoSlots: {
-      front_three_quarter: null,
-      rear_three_quarter: null,
-      side_profile: null,
-      interior_dash: null,
-      odometer: null,
-    },
-    extraPhotos: [],
-    serviceRecordFiles: [],
-    vehicleForm: initialVehicleForm,
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Form State
+  const [formData, setFormData] = useState({
+    make: '',
+    model: '',
+    year: '2023',
+    trim: '',
+    previous_owners: '1',
+    specs: 'GCC Specs',
+    mileage: '',
+    price: '',
+    city: 'Dubai',
+    transmission: 'Automatic',
+    fuel_type: 'Petrol',
+    description: '',
+    has_agency_history: true,
+    last_service_date: '',
+    service_notes: '',
+    seller_name: '',
+    seller_phone: '',
   });
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [newImageUrl, setNewImageUrl] = useState('');
 
-  const handlePhotoSlotsChange = useCallback((slots: Record<PhotoSlotKey, File | null>, extras: File[]) => {
-    setState(prev => ({
-      ...prev,
-      photoSlots: slots,
-      extraPhotos: extras,
-    }));
-  }, []);
-
-  const handleServiceRecordFilesChange = useCallback((files: File[]) => {
-    setState(prev => ({
-      ...prev,
-      serviceRecordFiles: files,
-    }));
-  }, []);
-
-  const handleVehicleFormChange = useCallback((changes: Partial<VehicleFormValues>) => {
-    setState(prev => ({
-      ...prev,
-      vehicleForm: {
-        ...prev.vehicleForm,
-        ...changes,
-      },
-    }));
-  }, []);
-
-  const handleLanguageToggle = useCallback(() => {
-    toggleLocale();
-    // Update the primary language in the form when toggling
-    setState(prev => ({
-      ...prev,
-      vehicleForm: {
-        ...prev.vehicleForm,
-        primaryLanguage: locale === 'en' ? 'ar' : 'en',
-      },
-    }));
-  }, [locale, toggleLocale]);
-
-  const handleSubmit = useCallback(async () => {
-    const requiredSlots: PhotoSlotKey[] = ['front_three_quarter', 'rear_three_quarter', 'side_profile', 'interior_dash', 'odometer'];
-    const missingSlots = requiredSlots.filter(key => !state.photoSlots[key]);
-
-    if (missingSlots.length > 0) {
-      setSubmitError('Please upload all 5 primary photos.');
-      return;
-    }
-
-    const { year, make, model, price, mileage, spec, emirate, sellerName, sellerPhone } = state.vehicleForm;
-    if (!year || !make || !model || !price || !mileage || !spec || !emirate || !sellerName || !sellerPhone.trim()) {
-      setSubmitError('Please fill in all required fields including Price and Mileage.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setIsUploadingMedia(true);
-    setSubmitError(null);
-
-    try {
-      const timestamp = Date.now();
-      const uploadedImages: string[] = [];
-
-      // 1. Upload the 5 key vehicle photo slots
-      for (const key of requiredSlots) {
-        const file = state.photoSlots[key];
-        if (file) {
-          const filePath = `listings/${timestamp}_${key}.webp`;
-          const { error: uploadErr } = await supabase.storage.from('car-photos').upload(filePath, file, {
-            contentType: file.type || 'image/webp',
-            upsert: false,
-          });
-          if (uploadErr) throw uploadErr;
-
-          const { data: { publicUrl } } = supabase.storage.from('car-photos').getPublicUrl(filePath);
-          uploadedImages.push(publicUrl);
-        }
-      }
-
-      // 2. Upload any extra vehicle photos
-      for (let i = 0; i < state.extraPhotos.length; i++) {
-        const file = state.extraPhotos[i];
-        const filePath = `listings/${timestamp}_extra_${i}.webp`;
-        const { error: uploadErr } = await supabase.storage.from('car-photos').upload(filePath, file, {
-          contentType: file.type || 'image/webp',
-          upsert: false,
-        });
-        if (uploadErr) throw uploadErr;
-
-        const { data: { publicUrl } } = supabase.storage.from('car-photos').getPublicUrl(filePath);
-        uploadedImages.push(publicUrl);
-      }
-
-      // 3. Upload service records (PDF / Images)
-      const uploadedServiceRecords: string[] = [];
-      for (let i = 0; i < state.serviceRecordFiles.length; i++) {
-        const file = state.serviceRecordFiles[i];
-        const ext = file.name.substring(file.name.lastIndexOf('.')) || '.pdf';
-        const filePath = `records/${timestamp}_${i}${ext}`;
-        const { error: uploadErr } = await supabase.storage.from('service-records').upload(filePath, file, {
-          upsert: false,
-        });
-        if (uploadErr) throw uploadErr;
-
-        const { data: { publicUrl } } = supabase.storage.from('service-records').getPublicUrl(filePath);
-        uploadedServiceRecords.push(publicUrl);
-      }
-
-      // 4. Handle translation if needed
-      let finalDescription = state.vehicleForm.description;
-      let finalDescriptionEn = state.vehicleForm.descriptionEn;
-      let finalDescriptionAr = state.vehicleForm.descriptionAr;
-      let finalServiceNotes = state.vehicleForm.serviceNotes;
-      let finalServiceNotesEn = state.vehicleForm.serviceNotesEn;
-      let finalServiceNotesAr = state.vehicleForm.serviceNotesAr;
-
-      // If we need to translate description
-      if (state.vehicleForm.primaryLanguage === 'ar' && state.vehicleForm.description && !state.vehicleForm.descriptionAr) {
-        // Translate from English to Arabic
-        const descTranslation = await fetch('/api/translate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            text: state.vehicleForm.description,
-            sourceLang: 'en',
-            targetLang: 'ar',
-          }),
-        });
-
-        if (descTranslation.ok) {
-          const descData = await descTranslation.json();
-          finalDescriptionAr = descData.translatedText;
-        } else {
-          // Fallback to original if translation fails
-          finalDescriptionAr = state.vehicleForm.description;
-        }
-      } else if (state.vehicleForm.primaryLanguage === 'en' && state.vehicleForm.description && !state.vehicleForm.descriptionEn) {
-        // Translate from Arabic to English
-        const descTranslation = await fetch('/api/translate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            text: state.vehicleForm.description,
-            sourceLang: 'ar',
-            targetLang: 'en',
-          }),
-        });
-
-        if (descTranslation.ok) {
-          const descData = await descTranslation.json();
-          finalDescriptionEn = descData.translatedText;
-        } else {
-          // Fallback to original if translation fails
-          finalDescriptionEn = state.vehicleForm.description;
-        }
-      }
-
-      // If we need to translate service notes
-      if (state.vehicleForm.primaryLanguage === 'ar' && state.vehicleForm.serviceNotes && !state.vehicleForm.serviceNotesAr) {
-        // Translate from English to Arabic
-        const notesTranslation = await fetch('/api/translate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            text: state.vehicleForm.serviceNotes,
-            sourceLang: 'en',
-            targetLang: 'ar',
-          }),
-        });
-
-        if (notesTranslation.ok) {
-          const notesData = await notesTranslation.json();
-          finalServiceNotesAr = notesData.translatedText;
-        } else {
-          // Fallback to original if translation fails
-          finalServiceNotesAr = state.vehicleForm.serviceNotes;
-        }
-      } else if (state.vehicleForm.primaryLanguage === 'en' && state.vehicleForm.serviceNotes && !state.vehicleForm.serviceNotesEn) {
-        // Translate from Arabic to English
-        const notesTranslation = await fetch('/api/translate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            text: state.vehicleForm.serviceNotes,
-            sourceLang: 'ar',
-            targetLang: 'en',
-          }),
-        });
-
-        if (notesTranslation.ok) {
-          const notesData = await notesTranslation.json();
-          finalServiceNotesEn = notesData.translatedText;
-        } else {
-          // Fallback to original if translation fails
-          finalServiceNotesEn = state.vehicleForm.serviceNotes;
-        }
-      }
-
-      // Determine what to save as the main description/notes based on primary language
-      if (state.vehicleForm.primaryLanguage === 'ar') {
-        finalDescription = state.vehicleForm.descriptionAr || state.vehicleForm.description;
-        finalServiceNotes = state.vehicleForm.serviceNotesAr || state.vehicleForm.serviceNotes;
-      } else {
-        finalDescription = state.vehicleForm.descriptionEn || state.vehicleForm.description;
-        finalServiceNotes = state.vehicleForm.serviceNotesEn || state.vehicleForm.serviceNotes;
-      }
-
-      // 5. Build database listing payload
-      const listingTitle = `${year} ${make} ${model} ${state.vehicleForm.trim || ''}`.trim();
-      const insertPayload = {
-        title: listingTitle,
-        make,
-        model,
-        year,
-        price: Number(price),
-        mileage: Number(mileage),
-        specs: spec,
-        city: emirate,
-        transmission: 'Automatic',
-        fuel_type: 'Petrol',
-        description: finalDescription,
-        descriptionEn: finalDescriptionEn,
-        descriptionAr: finalDescriptionAr,
-        seller_phone: sellerPhone,
-        whatsapp_number: sellerPhone,
-        image_urls: uploadedImages,
-        last_service_date: state.vehicleForm.lastServiceDate || null,
-        service_notes: finalServiceNotes,
-        serviceNotesEn: finalServiceNotesEn,
-        serviceNotesAr: finalServiceNotesAr,
-        service_record_urls: uploadedServiceRecords,
-        primary_language: state.vehicleForm.primaryLanguage,
-        status: 'active',
-      };
-
-      const { data, error: insertError } = await supabase
-        .from('listings')
-        .insert([insertPayload])
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
-      if (data) {
-        router.push(`/listing/${data.id}`);
-      }
-    } catch (err: any) {
-      console.error('Error submitting listing:', err);
-      setSubmitError(err.message || 'Failed to publish listing. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-      setIsUploadingMedia(false);
-    }
-  }, [state, router, supabase, locale]);
-
-  const handleReset = useCallback(() => {
-    setState({
-      photoSlots: {
-        front_three_quarter: null,
-        rear_three_quarter: null,
-        side_profile: null,
-        interior_dash: null,
-        odometer: null,
-      },
-      extraPhotos: [],
-      serviceRecordFiles: [],
-      vehicleForm: initialVehicleForm,
-    });
-    setSubmitError(null);
-  }, []);
-
-  const models = state.vehicleForm.make
-    ? carData.makes.find(m => m.make.toLowerCase() === state.vehicleForm.make?.toLowerCase())?.models || []
+  const emirateOptions = ['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain'];
+  const availableModels = formData.make
+    ? carData.makes.find((m) => m.make.toLowerCase() === formData.make.toLowerCase())?.models || []
     : [];
 
+  const handleAddImage = () => {
+    if (newImageUrl.trim() && newImageUrl.startsWith('http')) {
+      setImageUrls((prev) => [...prev, newImageUrl.trim()]);
+      setNewImageUrl('');
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setImageUrls((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg(null);
+
+    try {
+      const payload = {
+        make: formData.make,
+        model: formData.model,
+        year: parseInt(formData.year, 10),
+        trim: formData.trim || null,
+        specs: formData.specs,
+        mileage: parseInt(formData.mileage, 10) || 0,
+        price: parseInt(formData.price, 10) || 0,
+        city: formData.city,
+        transmission: formData.transmission,
+        fuel_type: formData.fuel_type,
+        previous_owners: parseInt(formData.previous_owners, 10) || 1,
+        description: formData.description,
+        last_service_date: formData.last_service_date || null,
+        service_notes: formData.service_notes || null,
+        seller_name: formData.seller_name || 'Vehicle Owner',
+        seller_phone: formData.seller_phone || null,
+        image_urls: imageUrls,
+      };
+
+      const { data, error } = await supabase.from('listings').insert([payload]).select();
+
+      if (error) throw error;
+      setSuccess(true);
+      if (data && data[0]?.id) {
+        setTimeout(() => router.push(`/listing/${data[0].id}`), 1200);
+      }
+    } catch (err: any) {
+      console.error('Submission error:', err);
+      setErrorMsg(err.message || 'Failed to submit vehicle listing.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 py-10">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
-          <div className="mb-8 border-b border-slate-100 pb-6">
-            <div className="flex justify-between items-center">
-              <h1 className="text-3xl font-extrabold text-slate-900">Sell Your Car</h1>
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-slate-500">
-                  Listing Language / لغة الإعلان:
-                </span>
-                <button
-                  onClick={handleLanguageToggle}
-                  className={`px-3 py-1 rounded border transition-all ${
-                    locale === 'en'
-                      ? 'bg-[#e03a14] text-white'
-                      : 'bg-[#f4f4f4] text-[#e03a14]'
-                  }`}
-                >
-                  {locale === 'en' ? 'English' : 'العربية'}
-                </button>
-              </div>
-            </div>
-            <p className="mt-1 text-slate-500">List your vehicle across the UAE with verified specs and service records.</p>
+    <div className="min-h-screen bg-[#f4f4f4] py-10">
+      <div className="max-w-3xl mx-auto px-4">
+        {/* Title Card */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-6">
+          <h1 className="text-2xl font-black text-slate-900">List Your Vehicle</h1>
+          <p className="text-xs text-slate-500 mt-1">
+            Publish verified UAE specs directly to buyers across all Emirates.
+          </p>
+        </div>
+
+        {success ? (
+          <div className="bg-white rounded-2xl border border-emerald-200 p-8 shadow-sm text-center">
+            <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+            <h2 className="text-xl font-bold text-slate-900 mb-1">Vehicle Listed Successfully!</h2>
+            <p className="text-xs text-slate-500">Redirecting to your live vehicle page...</p>
           </div>
-
-          {submitError && (
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-lg">
-              <p className="text-sm font-semibold text-red-800">{submitError}</p>
-            </div>
-          )}
-
-          {isUploadingMedia && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50">
-              <div className="bg-white rounded-2xl p-8 text-center shadow-xl max-w-sm mx-4">
-                <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mx-auto mb-4"></div>
-                <h3 className="text-lg font-bold text-slate-900">Uploading Vehicle Details...</h3>
-                <p className="text-sm text-slate-500 mt-1">Compressing photos and saving service documents.</p>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {errorMsg && (
+              <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-semibold">
+                {errorMsg}
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="space-y-10">
-            {/* Step 1: Photos */}
-            <section>
-              <h2 className="text-lg font-bold text-slate-900 mb-1">Step 1: Vehicle Photos</h2>
-              <p className="text-xs text-slate-500 mb-4">Upload clean, high-resolution photos for the 5 key angles.</p>
-              <PhotoSlotUploader onChange={handlePhotoSlotsChange} />
-            </section>
+            {/* STEP 1: VEHICLE SPECIFICATIONS */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Car className="w-4 h-4 text-[#e03a14]" />
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Step 1: Vehicle Information</h2>
+              </div>
 
-            {/* Step 2: Vehicle Specs */}
-            <section>
-              <h2 className="text-lg font-bold text-slate-900 mb-1">Step 2: Specifications & Pricing</h2>
-              <p className="text-xs text-slate-500 mb-4">Select vehicle details matching your official registration card (Mulkiya).</p>
-
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {/* Brand */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Brand *</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Make *</label>
                   <select
-                    value={state.vehicleForm.make ?? ''}
-                    onChange={(e) => handleVehicleFormChange({ make: e.target.value || null, model: null })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    required
+                    value={formData.make}
+                    onChange={(e) => setFormData({ ...formData, make: e.target.value, model: '' })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
                   >
-                    <option value="">Select Brand</option>
+                    <option value="">Select Make</option>
                     {carData.makes.map((item) => (
-                      <option key={item.make} value={item.make}>
-                        {item.make}
-                      </option>
+                      <option key={item.make} value={item.make}>{item.make}</option>
                     ))}
                   </select>
                 </div>
 
-                {/* Model */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Model *</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Model *</label>
                   <select
-                    value={state.vehicleForm.model ?? ''}
-                    onChange={(e) => handleVehicleFormChange({ model: e.target.value || null })}
-                    disabled={!state.vehicleForm.make}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100"
+                    required
+                    disabled={!formData.make}
+                    value={formData.model}
+                    onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white disabled:bg-slate-100"
                   >
-                    <option value="">{state.vehicleForm.make ? 'Select Model' : 'Select Brand First'}</option>
-                    {models.map((model) => (
-                      <option key={model} value={model}>
-                        {model}
-                      </option>
+                    <option value="">{formData.make ? 'Select Model' : 'Select Make First'}</option>
+                    {availableModels.map((mod) => (
+                      <option key={mod} value={mod}>{mod}</option>
                     ))}
                   </select>
                 </div>
 
-                {/* Year */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Year *</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Year *</label>
                   <select
-                    value={state.vehicleForm.year?.toString() ?? ''}
-                    onChange={(e) => handleVehicleFormChange({ year: e.target.value ? parseInt(e.target.value, 10) : null })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={formData.year}
+                    onChange={(e) => setFormData({ ...formData, year: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
                   >
-                    <option value="">Select Year</option>
-                    {years.map((yr) => (
-                      <option key={yr} value={yr}>
-                        {yr}
-                      </option>
+                    {years.map((y) => (
+                      <option key={y} value={y.toString()}>{y}</option>
                     ))}
                   </select>
                 </div>
 
-                {/* Price */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Price (AED) *</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Trim / Edition</label>
                   <input
-                    type="number"
-                    placeholder="e.g. 150000"
-                    value={state.vehicleForm.price ?? ''}
-                    onChange={(e) => handleVehicleFormChange({ price: e.target.value ? Number(e.target.value) : null })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    type="text"
+                    placeholder="e.g. AMG Line, Turbo, GT"
+                    value={formData.trim}
+                    onChange={(e) => setFormData({ ...formData, trim: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
                   />
                 </div>
 
-                {/* Mileage */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Mileage (km) *</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Previous Owners *</label>
+                  <select
+                    value={formData.previous_owners}
+                    onChange={(e) => setFormData({ ...formData, previous_owners: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                  >
+                    <option value="1">1 (Single Owner)</option>
+                    <option value="2">2 Owners</option>
+                    <option value="3">3 Owners</option>
+                    <option value="4">4+ Owners</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Regional Specs *</label>
+                  <select
+                    value={formData.specs}
+                    onChange={(e) => setFormData({ ...formData, specs: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                  >
+                    <option value="GCC Specs">GCC Specs</option>
+                    <option value="Non-GCC / American">American Specs</option>
+                    <option value="Non-GCC / Japanese">Japanese Specs</option>
+                    <option value="Non-GCC / European">European Specs</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Mileage (km) *</label>
                   <input
+                    required
                     type="number"
                     placeholder="e.g. 45000"
-                    value={state.vehicleForm.mileage ?? ''}
-                    onChange={(e) => handleVehicleFormChange({ mileage: e.target.value ? Number(e.target.value) : null })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={formData.mileage}
+                    onChange={(e) => setFormData({ ...formData, mileage: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
                   />
                 </div>
 
-                {/* Trim */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Trim / Edition</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Price (AED) *</label>
                   <input
-                    type="text"
-                    placeholder="e.g. Carrera S, GTS, VXR"
-                    value={state.vehicleForm.trim ?? ''}
-                    onChange={(e) => handleVehicleFormChange({ trim: e.target.value || null })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    required
+                    type="number"
+                    placeholder="e.g. 175000"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
                   />
                 </div>
 
-                {/* Regional Specs */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Regional Specs *</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Location / Emirate *</label>
                   <select
-                    value={state.vehicleForm.spec ?? 'GCC'}
-                    onChange={(e) => handleVehicleFormChange({ spec: e.target.value as VehicleSpec })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
                   >
-                    <option value="GCC">GCC Specs</option>
-                    <option value="American">American Specs</option>
-                    <option value="European">European Specs</option>
-                    <option value="Japanese">Japanese Specs</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                {/* City */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">City / Emirate *</label>
-                  <select
-                    value={state.vehicleForm.emirate ?? 'Dubai'}
-                    onChange={(e) => handleVehicleFormChange({ emirate: e.target.value as Emirate })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                  >
-                    {['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain'].map((city) => (
-                      <option key={city} value={city}>
-                        {city}
-                      </option>
+                    {emirateOptions.map((em) => (
+                      <option key={em} value={em}>{em}</option>
                     ))}
                   </select>
                 </div>
 
-                {/* Seller Phone */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Phone Number (Calls) *</label>
-                  <input
-                    type="tel"
-                    placeholder="+971 50 123 4567"
-                    value={state.vehicleForm.sellerPhone}
-                    onChange={(e) => handleVehicleFormChange({ sellerPhone: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                </div>
-
-                {/* Seller Name */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Seller / Dealer Name *</label>
-                  <input
-                    type="text"
-                    placeholder="Your Name"
-                    value={state.vehicleForm.sellerName}
-                    onChange={(e) => handleVehicleFormChange({ sellerName: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Transmission</label>
+                  <select
+                    value={formData.transmission}
+                    onChange={(e) => setFormData({ ...formData, transmission: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                  >
+                    <option value="Automatic">Automatic</option>
+                    <option value="Manual">Manual</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="mt-4">
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Vehicle Description</label>
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Vehicle Description</label>
                 <textarea
-                  rows={3}
-                  placeholder="Provide any additional details: packages, options, condition, or warranty..."
-                  value={state.vehicleForm.description}
-                  onChange={(e) => handleVehicleFormChange({ description: e.target.value })}
-                  className={`w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${
-                    locale === 'ar' ? 'text-right' : 'text-left'
-                  }`}
-                  dir={locale === 'ar' ? 'rtl' : 'ltr'}
+                  rows={4}
+                  placeholder="Detail options, condition, service history, and warranties..."
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
                 />
               </div>
-            </section>
+            </div>
 
-            {/* Step 3: Service History */}
-            <section className="bg-slate-50 border border-slate-200 rounded-xl p-5">
-              <h2 className="text-lg font-bold text-slate-900 mb-1">Step 3: Service History & Maintenance</h2>
-              <p className="text-xs text-slate-500 mb-4">Adding service records significantly improves buyer trust and speed to sell.</p>
+            {/* STEP 2: PHOTOS */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Camera className="w-4 h-4 text-[#e03a14]" />
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Step 2: Photos</h2>
+              </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  placeholder="Paste image URL (https://...)"
+                  value={newImageUrl}
+                  onChange={(e) => setNewImageUrl(e.target.value)}
+                  className="flex-1 px-3 py-2 text-sm rounded-xl border border-slate-300"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddImage}
+                  className="bg-slate-900 hover:bg-black text-white px-4 py-2 rounded-xl text-xs font-bold transition"
+                >
+                  Add Image
+                </button>
+              </div>
+
+              {imageUrls.length > 0 && (
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 pt-2">
+                  {imageUrls.map((url, idx) => (
+                    <div key={idx} className="relative group rounded-xl overflow-hidden aspect-[4/3] border border-slate-200">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`Car ${idx}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(idx)}
+                        className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600 transition"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* STEP 3: SERVICE HISTORY */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <FileText className="w-4 h-4 text-[#e03a14]" />
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Step 3: Service History</h2>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Last Service Date</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Last Service Date</label>
                   <input
                     type="date"
-                    value={state.vehicleForm.lastServiceDate ?? ''}
-                    onChange={(e) => handleVehicleFormChange({ lastServiceDate: e.target.value || null })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={formData.last_service_date}
+                    onChange={(e) => setFormData({ ...formData, last_service_date: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Upload Invoices / Service History (PDF, Images)</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Maintenance Notes</label>
                   <input
-                    type="file"
-                    multiple
-                    accept=".pdf,image/png,image/jpeg"
-                    onChange={(e) => handleServiceRecordFilesChange(Array.from(e.target.files || []))}
-                    className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    type="text"
+                    placeholder="e.g. Major service completed at 40k km"
+                    value={formData.service_notes}
+                    onChange={(e) => setFormData({ ...formData, service_notes: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
                   />
-                  {state.serviceRecordFiles.length > 0 && (
-                    <p className="text-xs text-blue-600 mt-1">{state.serviceRecordFiles.length} file(s) attached</p>
-                  )}
                 </div>
               </div>
-
-              <div className="mt-4">
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Service & Maintenance Notes</label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Recent major 60k service completed at agency, new Michelin tires, brake pads replaced."
-                  value={state.vehicleForm.serviceNotes ?? ''}
-                  onChange={(e) => handleVehicleFormChange({ serviceNotes: e.target.value || null })}
-                  className={`w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none ${
-                    locale === 'ar' ? 'text-right' : 'text-left'
-                  }`}
-                  dir={locale === 'ar' ? 'rtl' : 'ltr'}
-                />
-              </div>
-            </section>
-
-            {/* Actions */}
-            <div className="pt-4 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={handleReset}
-                className="text-sm font-semibold text-slate-500 hover:text-slate-800 transition"
-              >
-                Reset Form
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl shadow transition disabled:opacity-50"
-              >
-                {isSubmitting ? 'Publishing...' : 'Publish Listing'}
-              </button>
             </div>
-          </div>
-        </div>
+
+            {/* STEP 4: SELLER CONTACT */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <User className="w-4 h-4 text-[#e03a14]" />
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Step 4: Seller Details</h2>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Seller Name *</label>
+                  <input
+                    required
+                    type="text"
+                    placeholder="Your Name or Dealership"
+                    value={formData.seller_name}
+                    onChange={(e) => setFormData({ ...formData, seller_name: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Contact Phone / WhatsApp *</label>
+                  <input
+                    required
+                    type="tel"
+                    placeholder="+971 50 123 4567"
+                    value={formData.seller_phone}
+                    onChange={(e) => setFormData({ ...formData, seller_phone: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#e03a14] hover:bg-[#c53210] disabled:bg-slate-400 text-white font-bold py-3.5 px-6 rounded-xl transition text-sm flex items-center justify-center gap-2"
+            >
+              {loading ? 'Publishing Vehicle...' : 'Publish Listing'}
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );
-};
-
-export default SellPage;
+}
