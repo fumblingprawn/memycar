@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import DynamicTranslate from '@/components/common/DynamicTranslate';
 import { 
   Gauge, 
   Globe, 
@@ -226,7 +227,11 @@ export default function ListingDetailPage() {
               {/* Vehicle Title & Trim */}
               <div>
                 <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
-                  {listing.make} {listing.model}
+                  {listing.title ? (
+                    <DynamicTranslate text={listing.title} as="span" />
+                  ) : (
+                    `${listing.make} ${listing.model}`
+                  )}
                 </h1>
                 <p className="text-sm font-medium text-slate-500 mt-0.5">
                   {listing.trim ? `${listing.trim} • ` : ''}{listing.year}
@@ -388,7 +393,11 @@ export default function ListingDetailPage() {
             {listing.service_notes && (
               <div className="bg-slate-50 p-4 rounded-xl text-xs leading-relaxed text-slate-700 mb-4">
                 <p className="font-semibold text-slate-900 mb-1">Maintenance Notes:</p>
-                {listing.service_notes}
+                <DynamicTranslate
+                  as="p"
+                  text={listing.service_notes}
+                  className="text-slate-700"
+                />
               </div>
             )}
 
@@ -416,7 +425,11 @@ export default function ListingDetailPage() {
           {listing.description && (
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Vehicle Description</h2>
-              <p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">{listing.description}</p>
+              <DynamicTranslate
+                as="p"
+                text={listing.description}
+                className="text-sm text-slate-700 whitespace-pre-line leading-relaxed"
+              />
             </div>
           )}
         </div>
