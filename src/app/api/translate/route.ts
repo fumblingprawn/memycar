@@ -11,56 +11,51 @@ export async function POST(req: Request) {
       return NextResponse.json({ translatedText: '' });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      console.error('[Translate API] Missing OPENAI_API_KEY on server');
-      return NextResponse.json(
-        { translatedText: text, error: 'Missing OPENAI_API_KEY on server' },
-        { status: 200 }
-      );
+    const trimmed = text.trim();
+    const sourceLang = targetLang === 'ar' ? 'en' : 'ar';
+
+    // 1. Primary: Direct Google Translate Endpoint (No API key needed)
+    try {
+      const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(trimmed)}`;
+      const res = await fetch(googleUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+        },
+        next: { revalidate: 86400 },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        // Response structure: [[["Translated text", "Original text", ...]]]
+        if (Array.isArray(data) && Array.isArray(data[0])) {
+          const translated = data[0].map((item: any) => item[0]).filter(Boolean).join('');
+          if (translated) {
+            return NextResponse.json({ translatedText: translated });
+          }
+        }
+      }
+    } catch (gErr) {
+      console.warn('Google Translate public route error, trying fallback:', gErr);
     }
 
-    const targetLanguageName = targetLang === 'ar' ? 'Modern Standard Arabic' : 'English';
-
-    const systemPrompt = `You are a professional automotive translator for UAE and GCC car marketplaces (memycar.com).
-Translate the user's car listing details, description, or notes accurately into ${targetLanguageName}.
-Keep automotive terms accurate (e.g. GCC specs -> مواصفات خليجية, Mulkiya -> ملكية, agency warranty -> ضمان الوكالة, full service history -> سجل صيانة كامل).
-Return ONLY the translated text without conversational preamble or quotation marks.`;
-
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey.trim()}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: text },
-        ],
-        temperature: 0.2,
-      }),
-    });
-
-    if (!res.ok) {
-      const errBody = await res.text();
-      console.error('[Translate API] OpenAI API error response:', errBody);
-      return NextResponse.json(
-        { translatedText: text, openAiError: errBody },
-        { status: 200 }
-      );
+    // 2. Secondary Fallback: MyMemory Free Translation API
+    try {
+      const myMemoryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(trimmed)}&langpair=${sourceLang}|${targetLang}`;
+      const memRes = await fetch(myMemoryUrl);
+      if (memRes.ok) {
+        const memData = await memRes.json();
+        if (memData?.responseData?.translatedText) {
+          return NextResponse.json({ translatedText: memData.responseData.translatedText });
+        }
+      }
+    } catch (memErr) {
+      console.warn('MyMemory fallback error:', memErr);
     }
 
-    const data = await res.json();
-    const translatedText = data.choices?.[0]?.message?.content?.trim() || text;
-
-    return NextResponse.json({ translatedText });
+    // If both engines fail, return original text safely
+    return NextResponse.json({ translatedText: text });
   } catch (error: any) {
-    console.error('[Translate API] Unhandled server error:', error);
-    return NextResponse.json(
-      { translatedText: text, error: error?.message || 'Server error' },
-      { status: 500 }
-    );
+    console.error('[Translate API] Server error:', error);
+    return NextResponse.json({ translatedText: text, error: error?.message }, { status: 500 });
   }
 }
