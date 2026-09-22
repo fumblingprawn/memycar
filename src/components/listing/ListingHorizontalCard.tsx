@@ -3,262 +3,90 @@
 import React from 'react';
 import Link from 'next/link';
 import { Listing } from '@/types/listing';
-import { MapPin, ShieldCheck, Wrench, Globe, Heart } from 'lucide-react';
+import DynamicTranslate from '@/components/common/DynamicTranslate';
 import { useLanguage } from '@/context/LanguageContext';
+import { Gauge, MapPin, Calendar, ShieldCheck } from 'lucide-react';
 
-interface ListingHorizontalCardProps {
-  listing: Listing;
-}
+export default function ListingHorizontalCard({ listing }: { listing: Listing }) {
+  const { locale } = useLanguage();
 
-// Generate a gray SVG placeholder for onError
-const getGrayPlaceholder = () => {
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="400" height="225">
-      <rect width="400" height="225" fill="#ddd"/>
-      <text x="50%" y="50%" fill="#999" dominant-baseline="middle" text-anchor="middle">No Image</text>
-    </svg>
-  `;
-  return `data:image/svg+xml;base64,${window.btoa(svg)}`;
-};
+  const price = (listing as any).price ?? (listing as any).price_aed ?? 0;
+  const mileage = (listing as any).mileage ?? (listing as any).mileage_km ?? 0;
+  const city = (listing as any).city || (listing as any).emirate || 'Dubai';
+  const specs = (listing as any).specs || 'GCC Specs';
 
-export default function ListingHorizontalCard({ listing }: ListingHorizontalCardProps) {
-  const { locale, dir } = useLanguage();
-
-  // Fallback chain for primary image
-  const primaryImage =
-    (Array.isArray((listing as any).image_urls) && (listing as any).image_urls.length > 0 && (listing as any).image_urls[0]) ||
-    (Array.isArray((listing as any).images) && (listing as any).images.length > 0 && (listing as any).images[0]) ||
-    ((listing as any).image_url) ||
-    ((listing as any).photos?.front_three_quarter) ||
-    '/placeholder-car.jpg';
-
-  const isGcc = listing.specs === 'GCC';
-
-  // Price for display with proper fallback chain
-  const price = listing.price ?? listing.price_aed ?? 0;
-
-  // Service indicator text
-  let serviceIndicatorText = '';
-  if (listing.last_service_date) {
-    const date = new Date(listing.last_service_date);
-    const options: Intl.DateTimeFormatOptions = { month: 'short', year: 'numeric' };
-    serviceIndicatorText = `Serviced: ${date.toLocaleDateString(locale === 'ar' ? 'ar-US' : undefined, options)}`;
+  let coverImage = '/placeholder-car.jpg';
+  if (Array.isArray((listing as any).image_urls) && (listing as any).image_urls.length > 0) {
+    coverImage = (listing as any).image_urls[0];
+  } else if (Array.isArray((listing as any).images) && (listing as any).images.length > 0) {
+    coverImage = (listing as any).images[0];
   }
-
-  // Call button phone number
-  const callPhoneRaw = listing.seller_phone || (listing as any).whatsapp_number || '';
-  const callUrl = callPhoneRaw ? `tel:${callPhoneRaw}` : '#';
-
-  // Pre-compute boolean values to avoid TypeScript narrowing issues
-  const isFullAgency = listing.service_history === 'Full Agency';
-  const isUnderWarranty = listing.warranty === 'Under Agency Warranty';
-
-  // Get description based on UI language
-  const getDescription = () => {
-    if (locale === 'ar') {
-      return listing.description_ar || listing.description || '';
-    }
-    return listing.description_en || listing.description || '';
-  };
 
   return (
     <Link
       href={`/listing/${listing.id}`}
-      className="group block rounded-3xl border border-slate-100 overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white"
-      dir={dir}
-      lang={locale}
+      className="block bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-md transition group"
     >
-      {/* Horizontal Layout */}
-      <div className="flex">
-        {/* Left side: Image */}
-        <div className="w-64 relative aspect-[16/9] bg-slate-50 overflow-hidden shrink-0">
-          {primaryImage ? (
-            <>
-              <img
-                src={primaryImage}
-                alt={`${listing.year} ${listing.make} ${listing.model}`}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                loading="lazy"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = getGrayPlaceholder();
-                }}
-              />
-              {/* Thumbnail strip underneath (up to 3 extra photos) */}
-              <div className="absolute bottom-0 left-0 right-0 flex gap-1 p-1">
-                {[
-                  (listing as any).image_urls?.slice(1, 4),
-                  (listing as any).images?.slice(0, 3),
-                ]
-                  .flat()
-                  .filter(Boolean)
-                  .map((url: string, index: number) => (
-                    <div
-                      key={index}
-                      className="relative w-10 h-10 rounded overflow-hidden border border-slate-200"
-                    >
-                      <img
-                        src={url}
-                        alt={`Angle ${index + 2}`}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = getGrayPlaceholder();
-                        }}
-                      />
-                    </div>
-                  ))}
-              </div>
-            </>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
-              No cover image
-            </div>
-          )}
+      <div className="flex flex-col sm:flex-row">
+        {/* Vehicle Thumbnail */}
+        <div className="sm:w-64 h-48 sm:h-auto relative bg-slate-900 flex-shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={coverImage}
+            alt={`${listing.make} ${listing.model}`}
+            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+          />
+          <span className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded">
+            <DynamicTranslate text={specs} />
+          </span>
         </div>
 
-        {/* Right side: Content */}
-        <div className="flex-1 p-5">
-          <div className="mb-4">
-            <div className="flex justify-between items-start mb-2">
-              <div className="flex-1">
-                <h3 className="mb-1 text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                  {listing.year} {listing.make} {listing.model}
-                  {listing.trim ? <span className="ml-2 text-xs font-medium text-gray-500">{listing.trim}</span> : ''}
-                </h3>
-                <p className="text-sm text-gray-500 truncate">
-                  {listing.body_style || ''}
-                </p>
-              </div>
-              <div className="flex items-center space-x-3">
-                <span className="text-2xl font-bold text-blue-600">
-                  AED {Number(price).toLocaleString()}
-                </span>
+        {/* Vehicle Details */}
+        <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
+          <div>
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="font-extrabold text-slate-900 text-lg group-hover:text-[#e03a14] transition">
+                <DynamicTranslate text={`${listing.year} ${listing.make} ${listing.model}`} />
+                {(listing as any).trim && (
+                  <span className="text-slate-500 text-sm font-normal ml-1">
+                    • <DynamicTranslate text={(listing as any).trim} />
+                  </span>
+                )}
+              </h3>
+              <div className="text-xl font-black text-[#e03a14] whitespace-nowrap">
+                {locale === 'ar' ? 'درهم' : 'AED'} {Number(price).toLocaleString()}
               </div>
             </div>
+
+            {/* Description / Summary */}
+            {(listing as any).description && (
+              <p className="text-xs text-slate-500 line-clamp-2 mt-1">
+                <DynamicTranslate text={(listing as any).description} />
+              </p>
+            )}
           </div>
 
-          <div className="space-y-3">
-            <div className="text-sm text-gray-600 flex flex-wrap gap-4">
-              {/* Mileage */}
-              <div className="flex items-center gap-1">
-                <Wrench className="h-3 w-3 text-gray-400" />
-                <span>
-                  {listing.mileage_km ? Number(listing.mileage_km).toLocaleString() : '0'} km
-                </span>
-              </div>
-
-              {/* Body Style */}
-              {listing.body_style && (
-                <>
-                  <span className="w-0.5 bg-gray-300"></span>
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3 text-gray-400" />
-                    <span>{listing.body_style}</span>
-                  </span>
-                </>
-              )}
-            </div>
-
-            <div className="text-sm text-gray-600 flex flex-wrap gap-4">
-              {/* Specs */}
-              <div className="flex items-center gap-1">
-                <Globe className="h-3 w-3 text-gray-400" />
-                <span>{listing.specs}</span>
-              </div>
-
-              {/* Transmission */}
-              {listing.transmission && (
-                <>
-                  <span className="w-0.5 bg-gray-300"></span>
-                  <span className="flex items-center gap-1">
-                    <Wrench className="h-3 w-3 text-gray-400" />
-                    <span>{listing.transmission}</span>
-                  </span>
-                </>
-              )}
-
-              {/* Fuel Type */}
-              {listing.fuel_type && (
-                <>
-                  <span className="w-0.5 bg-gray-300"></span>
-                  <span className="flex items-center gap-1">
-                    <Wrench className="h-3 w-3 text-gray-400" />
-                    <span>{listing.fuel_type}</span>
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-4 pt-3 border-t border-slate-100">
-            <div className="flex items-center gap-3 text-sm">
-              {isGcc && (
-                <span className="px-3 py-1 bg-emerald-50 text-emerald-800 text-xs rounded">
-                  🇦🇪 GCC Specs
-                </span>
-              )}
-              {isFullAgency && (
-                <span className="px-3 py-1 bg-blue-50 text-blue-800 text-xs rounded">
-                  <ShieldCheck className="h-3 w-3 mr-1" /> Full Service History
-                </span>
-              )}
-            </div>
-          </div>
-
-          {listing.description && (
-            <div className="mt-4">
-              <p className="text-sm text-gray-600 line-clamp-2">{getDescription()}</p>
-            </div>
-          )}
-
-          <div className="mt-6 flex items-center gap-3 text-sm">
+          {/* Key Specs Pills */}
+          <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-600 pt-2 border-t border-slate-100">
             <div className="flex items-center gap-1">
-              <MapPin className="h-3 w-3 text-gray-400" />
-              <span>{listing.emirate}, UAE</span>
+              <Gauge className="w-3.5 h-3.5 text-slate-400" />
+              <span>{Number(mileage).toLocaleString()} {locale === 'ar' ? 'كم' : 'km'}</span>
             </div>
+            <div className="flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <span>{listing.year}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5 text-slate-400" />
+              <DynamicTranslate text={city} />
+            </div>
+            {(listing as any).last_service_date && (
+              <div className="flex items-center gap-1 text-emerald-600 font-bold">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>{locale === 'ar' ? 'سعر مميز' : 'Great Price'}</span>
+              </div>
+            )}
           </div>
-        </div>
-      </div>
-
-      {/* Card Footer */}
-      <div className="pt-5 pb-4">
-        <div className="flex justify-between items-center">
-          {/* Call Seller Button */}
-          {callUrl && (
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (callUrl) {
-                  window.location.href = callUrl;
-                }
-              }}
-              className="bg-[#e03a14] hover:bg-[#c53210] text-white font-semibold py-1.5 px-4 rounded-lg transition-all hover:-translate-y-1 text-xs"
-            >
-              Call Seller
-            </button>
-          )}
-
-          {/* Save / Bookmark Button */}
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              const saved = JSON.parse(localStorage.getItem('memycar_saved') || '[]');
-              const isSaved = saved.includes(listing.id);
-              if (isSaved) {
-                localStorage.setItem('memycar_saved', JSON.stringify(saved.filter((id: string) => id !== listing.id)));
-              } else {
-                localStorage.setItem('memycar_saved', JSON.stringify([...saved, listing.id]));
-              }
-              // Optionally show a toast or feedback
-            }}
-            className="flex-1 flex items-center justify-center bg-slate-200 hover:bg-slate-300 text-gray-500 font-medium py-1.5 px-4 rounded-lg transition-all hover:-translate-y-1 text-xs"
-          >
-            <Heart className="h-3 w-3" />
-            Bookmark
-          </button>
         </div>
       </div>
     </Link>
