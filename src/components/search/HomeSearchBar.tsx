@@ -44,7 +44,7 @@ export default function HomeSearchBar() {
     if (specs) params.set('specs', specs);
 
     const qs = params.toString();
-    router.push(qs ? `/?${qs}` : '/');
+    router.push(qs ? `/search?${qs}` : '/search');
   };
 
   const handleReset = () => {
@@ -274,7 +274,7 @@ export default function HomeSearchBar() {
             onClick={handleSearch}
             className="w-full bg-[#e03a14] hover:bg-[#c53210] text-white font-bold py-3 px-4 rounded-xl transition-all duration-200 transform hover:-translate-y-1"
           >
-            Show Results / Fahrzeuge anzeigen
+            Search Cars
           </button>
         </div>
 

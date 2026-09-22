@@ -108,10 +108,10 @@ export default function ListingDetailPage() {
   // Determine price rating (simplified logic)
   const getPriceRating = (price: number) => {
     // This is a simplified version - in reality you'd compare to market average
-    if (price < 100000) return { text: 'Sehr guter Preis', color: 'bg-green-50 text-green-600' };
-    if (price < 200000) return { text: 'Guter Preis', color: 'bg-green-50 text-green-600' };
-    if (price < 300000) return { text: 'Fairer Preis', color: 'bg-yellow-50 text-yellow-600' };
-    return { text: 'Über průměr', color: 'bg-red-50 text-red-600' };
+    if (price < 100000) return { text: 'Great Price', color: 'bg-green-50 text-green-600' };
+    if (price < 200000) return { text: 'Good Price', color: 'bg-green-50 text-green-600' };
+    if (price < 300000) return { text: 'Fair Price', color: 'bg-yellow-50 text-yellow-600' };
+    return { text: 'Above Average', color: 'bg-red-50 text-red-600' };
   };
 
   const priceRating = getPriceRating(price);
@@ -187,7 +187,7 @@ export default function ListingDetailPage() {
                       }}
                       className="bg-black/50 text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-black/60 transition"
                     >
-                      Alle Bilder ({images.length})
+                      All Photos ({images.length})
                     </button>
                     <button
                       onClick={() => {
@@ -195,7 +195,7 @@ export default function ListingDetailPage() {
                       }}
                       className="bg-black/50 text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-black/60 transition"
                     >
-                      Vergrößern
+                      Enlarge
                     </button>
                   </div>
                 </>
@@ -315,7 +315,7 @@ export default function ListingDetailPage() {
                   }}
                   className="flex-1 flex items-center justify-center border border-slate-200 hover:border-[#e03a14] hover:text-[#e03a14] py-2 px-4 rounded-xl text-sm font-medium transition-colors"
                 >
-                  <span className="mr-2">♡</span> Parken (Save)
+                  <span className="mr-2">♡</span> Bookmark
                 </button>
                 <button
                   onClick={(e) => {
@@ -331,7 +331,7 @@ export default function ListingDetailPage() {
                   }}
                   className="flex-1 flex items-center justify-center border border-slate-200 hover:border-[#e03a14] hover:text-[#e03a14] py-2 px-4 rounded-xl text-sm font-medium transition-colors"
                 >
-                  <span className="mr-2">🔗</span> Teilen (Share)
+                  <span className="mr-2">🔗</span> Share
                 </button>
               </div>
             </div>
@@ -359,7 +359,7 @@ export default function ListingDetailPage() {
                 {/* Mileage */}
                 <div className="bg-slate-50 p-3 rounded-xl">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400">Kilometerstand</span>
+                    <span className="text-xs text-slate-400">Mileage</span>
                     <span className="text-sm font-bold text-slate-900">{Number(mileage).toLocaleString()} km</span>
                   </div>
                 </div>
@@ -375,7 +375,7 @@ export default function ListingDetailPage() {
                 {/* Fuel Type */}
                 <div className="bg-slate-50 p-3 rounded-xl">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400">Kraftstoffart</span>
+                    <span className="text-xs text-slate-400">Fuel Type</span>
                     <span className="text-sm font-bold text-slate-900">
                       {listing.fuel_type || '-'}
                     </span>
@@ -385,7 +385,7 @@ export default function ListingDetailPage() {
                 {/* Transmission */}
                 <div className="bg-slate-50 p-3 rounded-xl">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400">Getriebe</span>
+                    <span className="text-xs text-slate-400">Transmission</span>
                     <span className="text-sm font-bold text-slate-900">
                       {listing.transmission || '-'}
                     </span>
@@ -395,7 +395,7 @@ export default function ListingDetailPage() {
                 {/* Year (formatted as MM/YYYY) */}
                 <div className="bg-slate-50 p-3 rounded-xl">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400">Erstzulassung</span>
+                    <span className="text-xs text-slate-400">Year</span>
                     <span className="text-sm font-bold text-slate-900">
                       {listing.year ? `01/${listing.year}` : '-'}
                     </span>

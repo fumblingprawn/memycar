@@ -248,7 +248,7 @@ export default function ListingHorizontalCard({ listing }: ListingHorizontalCard
               const saved = JSON.parse(localStorage.getItem('memycar_saved') || '[]');
               const isSaved = saved.includes(listing.id);
               if (isSaved) {
-                localStorage.setItem('memycar_saved', JSON.stringify(saved.filter(id => id !== listing.id)));
+                localStorage.setItem('memycar_saved', JSON.stringify(saved.filter((id: string) => id !== listing.id)));
               } else {
                 localStorage.setItem('memycar_saved', JSON.stringify([...saved, listing.id]));
               }

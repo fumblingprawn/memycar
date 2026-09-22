@@ -42,6 +42,19 @@ export default function SearchPage() {
   // Emirate options
   const emirateOptions = ['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain'];
 
+  // Mileage options (in km)
+  const mileageOptions = [
+    { value: '', label: 'from' },
+    { value: '0', label: '0' },
+    { value: '10000', label: '10k' },
+    { value: '25000', label: '25k' },
+    { value: '50000', label: '50k' },
+    { value: '75000', label: '75k' },
+    { value: '100000', label: '100k' },
+    { value: '150000', label: '150k' },
+    { value: '200000', label: '200k+' }
+  ];
+
   // Sort options
   const sortOptions = [
     { label: 'Standard', value: 'standard' },
@@ -71,7 +84,7 @@ export default function SearchPage() {
     setEmirate('');
     setFreeText('');
     setSort('standard');
-    router.push('/');
+    router.push('/search');
   };
 
   // Build Supabase query
@@ -167,9 +180,9 @@ export default function SearchPage() {
 
       const qs = params.toString();
       if (qs) {
-        router.replace(`/?${qs}`, { scroll: false });
+        router.replace(`/search?${qs}`, { scroll: false });
       } else {
-        router.replace('/', { scroll: false });
+        router.replace('/search', { scroll: false });
       }
     };
 
@@ -528,11 +541,12 @@ export default function SearchPage() {
                         onChange={(e) => setMileageFrom(e.target.value)}
                         className="w-full px-4 py-3 rounded border border-slate-300 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
                       >
-                        {[0].map((mileage) => {
-                          return <option key={mileage} value={mileage.toString()}>
-                            test
-                          </option>;
-                        })</select>
+                        {mileageOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                        </select>
                     </div>
                     <div>
                       <label className="text-xs font-medium text-gray-600 block mb-1">To</label>
@@ -541,9 +555,11 @@ export default function SearchPage() {
                         onChange={(e) => setMileageTo(e.target.value)}
                         className="w-full px-4 py-3 rounded border border-slate-300 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
                       >
-                        <option value="">to</option>
-                        <option value="10000">10,000 km</option>
-                        <option value="30000">30,000 km</option>
+                        {mileageOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.value === '' ? 'to' : option.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>

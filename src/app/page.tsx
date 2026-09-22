@@ -1,135 +1,72 @@
+'use client';
+
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
-import { Listing } from '@/types/listing';
-import ListingCard from '@/components/listing/ListingCard';
 import HomeSearchBar from '@/components/search/HomeSearchBar';
 import { Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import ListingHorizontalCard from '@/components/listing/ListingHorizontalCard';
+import { Listing } from '@/types/listing';
 
-interface HomePageProps {
-  searchParams: Promise<{
-    make?: string;
-    model?: string;
-    year_from?: string;
-    year_to?: string;
-    mileage_from?: string;
-    mileage_to?: string;
-    price_from?: string;
-    price_to?: string;
-    emirate?: Emirate;
-    specs?: VehicleSpec;
-  }>;
-}
+export default function HomePage() {
+  const [featuredListings, setFeaturedListings] = useState<Listing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-export default async function HomePage({ searchParams }: HomePageProps) {
-  const resolvedParams = await searchParams;
-  const supabase = await createClient();
+  useEffect(() => {
+    const fetchFeaturedListings = async () => {
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(6);
 
-  // Start with base query
-  let query = supabase.from('listings').select('*');
+        if (error) throw error;
+        setFeaturedListings(data || []);
+      } catch (err) {
+        console.error('Error fetching featured listings:', err);
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Apply filters from the search bar (adjust parameter names to match new HomeSearchBar)
-  if (resolvedParams.make) {
-    query = query.eq('make', resolvedParams.make);
-  }
-  if (resolvedParams.model) {
-    query = query.eq('model', resolvedParams.model);
-  }
-  if (resolvedParams.year_from) {
-    query = query.gte('year', parseInt(resolvedParams.year_from));
-  }
-  if (resolvedParams.year_to) {
-    query = query.lte('year', parseInt(resolvedParams.year_to));
-  }
-  if (resolvedParams.mileage_from) {
-    query = query.gte('mileage_km', parseInt(resolvedParams.mileage_from));
-  }
-  if (resolvedParams.mileage_to) {
-    query = query.lte('mileage_km', parseInt(resolvedParams.mileage_to));
-  }
-  if (resolvedParams.price_from) {
-    query = query.gte('price_aed', parseInt(resolvedParams.price_from));
-  }
-  if (resolvedParams.price_to) {
-    query = query.lte('price_aed', parseInt(resolvedParams.price_to));
-  }
-  if (resolvedParams.emirate) {
-    query = query.eq('emirate', resolvedParams.emirate);
-  }
-  if (resolvedParams.specs) {
-    query = query.eq('specs', resolvedParams.specs);
-  }
-
-  // Order by newest first
-  query = query.order('created_at', { ascending: false });
-
-  // Execute query
-  const { data: listings, error } = await query;
-
-  if (error) {
-    console.error('Error fetching listings:', error);
-    return (
-      <div className="min-h-screen bg-[#f4f4f4]">
-        <div className="max-w-6xl mx-auto py-12 text-center">
-          <p className="text-slate-500">Failed to load listings. Please try again later.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const typedListings = (listings || []) as unknown as Listing[];
+    fetchFeaturedListings();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#f4f4f4]">
-      {/* Header with subtle animation */}
-      <header className="bg-white border-b border-slate-100">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 transition-all duration-300 hover:-translate-y-1">
-            <span className="font-black text-xl tracking-tight text-gray-900">
-              memycar<span className="text-[#e03a14]">.com</span>
-            </span>
-            <span className="hidden sm:inline-block text-[10px] font-bold bg-[#f4f4f4] text-slate-600 px-2 py-0.5 rounded-full uppercase tracking-wider">
-              UAE
-            </span>
-          </Link>
-
-          <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="text-sm font-medium text-gray-600 hover:text-gray-800"
-            >
-              Search
-            </Link>
-            <Link
-              href="/sell"
-              className="flex items-center gap-1.5 bg-[#e03a14] hover:bg-[#c53210] text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all duration-300 hover:-translate-y-1"
-            >
-              <Plus className="w-4 h-4" />
-              Sell Your Car
-            </Link>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content - Clean, centered search */}
-      <main className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-[#f4f4f4]">
+      <main className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-[#f4f4f4] py-12">
         <div className="max-w-4xl w-full px-4 sm:px-6 lg:px-8">
           {/* Centered Search Card */}
           <div className="space-y-8">
             <HomeSearchBar />
 
-            {/* Optional: Show recent listings below search */}
-            {typedListings.length > 0 && (
+            {/* Featured & Latest Additions Section */}
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-4 border-[#e03a14] border-t-transparent mx-auto mb-4"></div>
+                <p className="text-slate-600">Loading featured cars...</p>
+              </div>
+            ) : error ? (
+              <div className="text-center py-12">
+                <p className="text-red-600">Error loading featured cars. Please try again.</p>
+              </div>
+            ) : featuredListings.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-slate-500">No featured cars available at the moment.</p>
+              </div>
+            ) : (
               <>
-                <h2 className="mb-4 text-2xl font-bold text-gray-900">
-                  Featured Listings
-                </h2>
-                <div className="grid gap-6">
-                  {/* Responsive grid: 1 column on mobile, 2 on tablet, 3 on desktop */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {typedListings.slice(0, 6).map((listing) => (
-                      <ListingCard key={listing.id} listing={listing} />
-                    ))}
-                  </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Featured & Latest Additions</h2>
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {featuredListings.map((listing) => (
+                    <ListingHorizontalCard key={listing.id} listing={listing} />
+                  ))}
                 </div>
               </>
             )}
