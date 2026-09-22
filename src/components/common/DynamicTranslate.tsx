@@ -4,12 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface DynamicTranslateProps {
-  text: string;
-  as?: 'p' | 'span' | 'h1' | 'h2' | 'div';
+  text?: string | null;
+  as?: 'p' | 'span' | 'h1' | 'h2' | 'h3' | 'div';
   className?: string;
 }
 
-// In-memory client cache to prevent redundant API calls during a browsing session
 const translationCache = new Map<string, string>();
 
 export default function DynamicTranslate({
@@ -18,61 +17,60 @@ export default function DynamicTranslate({
   className = '',
 }: DynamicTranslateProps) {
   const { locale } = useLanguage();
-  const [displayText, setDisplayText] = useState(text);
+  const rawText = (text || '').trim();
+  const [displayText, setDisplayText] = useState(rawText);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!text || !text.trim()) {
+    if (!rawText) {
       setDisplayText('');
       return;
     }
 
-    // Detect if text is mostly Arabic
-    const isArabicText = /[\u0600-\u06FF]/.test(text);
-    const textLang = isArabicText ? 'ar' : 'en';
-
-    // If active locale matches the text language, render directly
-    if (locale === textLang) {
-      setDisplayText(text);
+    // When English is selected, revert immediately to raw text
+    if (locale === 'en') {
+      setDisplayText(rawText);
       return;
     }
 
-    // Check client session cache
-    const cacheKey = `${locale}:${text}`;
+    const cacheKey = `${locale}:${rawText}`;
     if (translationCache.has(cacheKey)) {
       setDisplayText(translationCache.get(cacheKey)!);
       return;
     }
 
-    // Fetch dynamic translation from OpenAI
     let isMounted = true;
-    async function translate() {
+
+    async function fetchTranslation() {
       setLoading(true);
       try {
         const res = await fetch('/api/translate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, targetLang: locale }),
+          body: JSON.stringify({ text: rawText, targetLang: locale }),
         });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+
         if (isMounted && data.translatedText) {
           translationCache.set(cacheKey, data.translatedText);
           setDisplayText(data.translatedText);
         }
       } catch (err) {
-        console.error('Dynamic translation failed:', err);
-        if (isMounted) setDisplayText(text);
+        console.error('Dynamic translate error:', err);
+        if (isMounted) setDisplayText(rawText);
       } finally {
         if (isMounted) setLoading(false);
       }
     }
 
-    translate();
+    fetchTranslation();
 
     return () => {
       isMounted = false;
     };
-  }, [text, locale]);
+  }, [rawText, locale]);
 
   return (
     <Component className={`${className} ${loading ? 'opacity-60 animate-pulse' : 'transition-opacity duration-200'}`}>
