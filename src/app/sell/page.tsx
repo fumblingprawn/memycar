@@ -6,6 +6,7 @@ import { carData, years } from '@/lib/constants/car-data';
 import { PhotoSlotKey, Emirate, VehicleSpec, ServiceHistory, PaintCondition, WarrantyStatus } from '@/types/listing';
 import { useRouter } from 'next/navigation';
 import PhotoSlotUploader from '@/components/sell/PhotoSlotUploader';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface VehicleFormValues {
   year: number | null;
@@ -23,8 +24,13 @@ interface VehicleFormValues {
   sellerName: string;
   sellerPhone: string;
   description: string;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
   lastServiceDate: string | null;
   serviceNotes: string | null;
+  serviceNotesEn: string | null;
+  serviceNotesAr: string | null;
+  primaryLanguage: 'en' | 'ar';
 }
 
 interface SellPageState {
@@ -50,13 +56,19 @@ const initialVehicleForm: VehicleFormValues = {
   sellerName: '',
   sellerPhone: '',
   description: '',
+  descriptionEn: null,
+  descriptionAr: null,
   lastServiceDate: null,
-  serviceNotes: null,
+  serviceNotes: '',
+  serviceNotesEn: null,
+  serviceNotesAr: null,
+  primaryLanguage: 'en',
 };
 
 const SellPage: React.FC = () => {
   const router = useRouter();
   const supabase = createClient();
+  const { locale, toggleLocale } = useLanguage();
 
   const [state, setState] = useState<SellPageState>({
     photoSlots: {
@@ -99,6 +111,18 @@ const SellPage: React.FC = () => {
       },
     }));
   }, []);
+
+  const handleLanguageToggle = useCallback(() => {
+    toggleLocale();
+    // Update the primary language in the form when toggling
+    setState(prev => ({
+      ...prev,
+      vehicleForm: {
+        ...prev.vehicleForm,
+        primaryLanguage: locale === 'en' ? 'ar' : 'en',
+      },
+    }));
+  }, [locale, toggleLocale]);
 
   const handleSubmit = useCallback(async () => {
     const requiredSlots: PhotoSlotKey[] = ['front_three_quarter', 'rear_three_quarter', 'side_profile', 'interior_dash', 'odometer'];
@@ -168,7 +192,114 @@ const SellPage: React.FC = () => {
         uploadedServiceRecords.push(publicUrl);
       }
 
-      // 4. Build database listing payload
+      // 4. Handle translation if needed
+      let finalDescription = state.vehicleForm.description;
+      let finalDescriptionEn = state.vehicleForm.descriptionEn;
+      let finalDescriptionAr = state.vehicleForm.descriptionAr;
+      let finalServiceNotes = state.vehicleForm.serviceNotes;
+      let finalServiceNotesEn = state.vehicleForm.serviceNotesEn;
+      let finalServiceNotesAr = state.vehicleForm.serviceNotesAr;
+
+      // If we need to translate description
+      if (state.vehicleForm.primaryLanguage === 'ar' && state.vehicleForm.description && !state.vehicleForm.descriptionAr) {
+        // Translate from English to Arabic
+        const descTranslation = await fetch('/api/translate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: state.vehicleForm.description,
+            sourceLang: 'en',
+            targetLang: 'ar',
+          }),
+        });
+
+        if (descTranslation.ok) {
+          const descData = await descTranslation.json();
+          finalDescriptionAr = descData.translatedText;
+        } else {
+          // Fallback to original if translation fails
+          finalDescriptionAr = state.vehicleForm.description;
+        }
+      } else if (state.vehicleForm.primaryLanguage === 'en' && state.vehicleForm.description && !state.vehicleForm.descriptionEn) {
+        // Translate from Arabic to English
+        const descTranslation = await fetch('/api/translate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: state.vehicleForm.description,
+            sourceLang: 'ar',
+            targetLang: 'en',
+          }),
+        });
+
+        if (descTranslation.ok) {
+          const descData = await descTranslation.json();
+          finalDescriptionEn = descData.translatedText;
+        } else {
+          // Fallback to original if translation fails
+          finalDescriptionEn = state.vehicleForm.description;
+        }
+      }
+
+      // If we need to translate service notes
+      if (state.vehicleForm.primaryLanguage === 'ar' && state.vehicleForm.serviceNotes && !state.vehicleForm.serviceNotesAr) {
+        // Translate from English to Arabic
+        const notesTranslation = await fetch('/api/translate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: state.vehicleForm.serviceNotes,
+            sourceLang: 'en',
+            targetLang: 'ar',
+          }),
+        });
+
+        if (notesTranslation.ok) {
+          const notesData = await notesTranslation.json();
+          finalServiceNotesAr = notesData.translatedText;
+        } else {
+          // Fallback to original if translation fails
+          finalServiceNotesAr = state.vehicleForm.serviceNotes;
+        }
+      } else if (state.vehicleForm.primaryLanguage === 'en' && state.vehicleForm.serviceNotes && !state.vehicleForm.serviceNotesEn) {
+        // Translate from Arabic to English
+        const notesTranslation = await fetch('/api/translate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: state.vehicleForm.serviceNotes,
+            sourceLang: 'ar',
+            targetLang: 'en',
+          }),
+        });
+
+        if (notesTranslation.ok) {
+          const notesData = await notesTranslation.json();
+          finalServiceNotesEn = notesData.translatedText;
+        } else {
+          // Fallback to original if translation fails
+          finalServiceNotesEn = state.vehicleForm.serviceNotes;
+        }
+      }
+
+      // Determine what to save as the main description/notes based on primary language
+      if (state.vehicleForm.primaryLanguage === 'ar') {
+        finalDescription = state.vehicleForm.descriptionAr || state.vehicleForm.description;
+        finalServiceNotes = state.vehicleForm.serviceNotesAr || state.vehicleForm.serviceNotes;
+      } else {
+        finalDescription = state.vehicleForm.descriptionEn || state.vehicleForm.description;
+        finalServiceNotes = state.vehicleForm.serviceNotesEn || state.vehicleForm.serviceNotes;
+      }
+
+      // 5. Build database listing payload
       const listingTitle = `${year} ${make} ${model} ${state.vehicleForm.trim || ''}`.trim();
       const insertPayload = {
         title: listingTitle,
@@ -181,13 +312,18 @@ const SellPage: React.FC = () => {
         city: emirate,
         transmission: 'Automatic',
         fuel_type: 'Petrol',
-        description: state.vehicleForm.description,
+        description: finalDescription,
+        descriptionEn: finalDescriptionEn,
+        descriptionAr: finalDescriptionAr,
         seller_phone: sellerPhone,
         whatsapp_number: sellerPhone,
         image_urls: uploadedImages,
         last_service_date: state.vehicleForm.lastServiceDate || null,
-        service_notes: state.vehicleForm.serviceNotes || null,
+        service_notes: finalServiceNotes,
+        serviceNotesEn: finalServiceNotesEn,
+        serviceNotesAr: finalServiceNotesAr,
         service_record_urls: uploadedServiceRecords,
+        primary_language: state.vehicleForm.primaryLanguage,
         status: 'active',
       };
 
@@ -209,7 +345,7 @@ const SellPage: React.FC = () => {
       setIsSubmitting(false);
       setIsUploadingMedia(false);
     }
-  }, [state, router, supabase]);
+  }, [state, router, supabase, locale]);
 
   const handleReset = useCallback(() => {
     setState({
@@ -236,7 +372,24 @@ const SellPage: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
           <div className="mb-8 border-b border-slate-100 pb-6">
-            <h1 className="text-3xl font-extrabold text-slate-900">Sell Your Car</h1>
+            <div className="flex justify-between items-center">
+              <h1 className="text-3xl font-extrabold text-slate-900">Sell Your Car</h1>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-slate-500">
+                  Listing Language / لغة الإعلان:
+                </span>
+                <button
+                  onClick={handleLanguageToggle}
+                  className={`px-3 py-1 rounded border transition-all ${
+                    locale === 'en'
+                      ? 'bg-[#e03a14] text-white'
+                      : 'bg-[#f4f4f4] text-[#e03a14]'
+                  }`}
+                >
+                  {locale === 'en' ? 'English' : 'العربية'}
+                </button>
+              </div>
+            </div>
             <p className="mt-1 text-slate-500">List your vehicle across the UAE with verified specs and service records.</p>
           </div>
 
@@ -280,7 +433,9 @@ const SellPage: React.FC = () => {
                   >
                     <option value="">Select Brand</option>
                     {carData.makes.map((item) => (
-                      <option key={item.make} value={item.make}>{item.make}</option>
+                      <option key={item.make} value={item.make}>
+                        {item.make}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -296,7 +451,9 @@ const SellPage: React.FC = () => {
                   >
                     <option value="">{state.vehicleForm.make ? 'Select Model' : 'Select Brand First'}</option>
                     {models.map((model) => (
-                      <option key={model} value={model}>{model}</option>
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -311,7 +468,9 @@ const SellPage: React.FC = () => {
                   >
                     <option value="">Select Year</option>
                     {years.map((yr) => (
-                      <option key={yr} value={yr}>{yr}</option>
+                      <option key={yr} value={yr}>
+                        {yr}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -377,7 +536,9 @@ const SellPage: React.FC = () => {
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                   >
                     {['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain'].map((city) => (
-                      <option key={city} value={city}>{city}</option>
+                      <option key={city} value={city}>
+                        {city}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -414,7 +575,10 @@ const SellPage: React.FC = () => {
                   placeholder="Provide any additional details: packages, options, condition, or warranty..."
                   value={state.vehicleForm.description}
                   onChange={(e) => handleVehicleFormChange({ description: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  className={`w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${
+                    locale === 'ar' ? 'text-right' : 'text-left'
+                  }`}
+                  dir={locale === 'ar' ? 'rtl' : 'ltr'}
                 />
               </div>
             </section>
@@ -457,7 +621,10 @@ const SellPage: React.FC = () => {
                   placeholder="e.g. Recent major 60k service completed at agency, new Michelin tires, brake pads replaced."
                   value={state.vehicleForm.serviceNotes ?? ''}
                   onChange={(e) => handleVehicleFormChange({ serviceNotes: e.target.value || null })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  className={`w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none ${
+                    locale === 'ar' ? 'text-right' : 'text-left'
+                  }`}
+                  dir={locale === 'ar' ? 'rtl' : 'ltr'}
                 />
               </div>
             </section>

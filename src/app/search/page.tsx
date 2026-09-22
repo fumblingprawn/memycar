@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Listing } from '@/types/listing';
 import { carData, years } from '@/lib/constants/car-data';
 import ListingHorizontalCard from '@/components/listing/ListingHorizontalCard';
 import { Search, ChevronDown, ChevronUp, X } from 'lucide-react';
+import Link from 'next/link';
 
 export default function SearchPage() {
   const router = useRouter();
@@ -15,11 +16,12 @@ export default function SearchPage() {
   // Initialize state from URL
   const [make, setMake] = useState(searchParams.get('make') || '');
   const [model, setModel] = useState(searchParams.get('model') || '');
-  const [minPrice, setMinPrice] = useState(searchParams.get('min_price') || '');
-  const [maxPrice, setMaxPrice] = useState(searchParams.get('max_price') || '');
-  const [minYear, setMinYear] = useState(searchParams.get('min_year') || '');
-  const [maxYear, setMaxYear] = useState(searchParams.get('max_year') || '');
-  const [maxMileage, setMaxMileage] = useState(searchParams.get('max_mileage') || '');
+  const [priceFrom, setPriceFrom] = useState(searchParams.get('price_from') || '');
+  const [priceTo, setPriceTo] = useState(searchParams.get('price_to') || '');
+  const [yearFrom, setYearFrom] = useState(searchParams.get('year_from') || '');
+  const [yearTo, setYearTo] = useState(searchParams.get('year_to') || '');
+  const [mileageFrom, setMileageFrom] = useState(searchParams.get('mileage_from') || '');
+  const [mileageTo, setMileageTo] = useState(searchParams.get('mileage_to') || '');
   const [specs, setSpecs] = useState(searchParams.get('specs') || '');
   const [emirate, setEmirate] = useState(searchParams.get('emirate') || '');
   const [freeText, setFreeText] = useState('');
@@ -33,7 +35,7 @@ export default function SearchPage() {
   // Specs options
   const specsOptions = [
     { label: 'GCC Specs', value: 'GCC' },
-    { label: 'Imported (US/EU/JP)', value: 'IMPORTED' },
+    { label: 'Non-GCC', value: 'Non-GCC' },
     { label: 'All', value: '' },
   ];
 
@@ -48,6 +50,29 @@ export default function SearchPage() {
     { label: 'Newest', value: 'newest' },
     { label: 'Lowest Mileage', value: 'mileage-low' },
   ];
+
+  // Handle make change
+  const handleMakeChange = (newMake: string) => {
+    setMake(newMake);
+    setModel(''); // Reset model when make changes
+  };
+
+  // Handle reset
+  const handleReset = () => {
+    setMake('');
+    setModel('');
+    setPriceFrom('');
+    setPriceTo('');
+    setYearFrom('');
+    setYearTo('');
+    setMileageFrom('');
+    setMileageTo('');
+    setSpecs('');
+    setEmirate('');
+    setFreeText('');
+    setSort('standard');
+    router.push('/');
+  };
 
   // Build Supabase query
   useEffect(() => {
@@ -64,25 +89,28 @@ export default function SearchPage() {
       if (model) {
         query = query.eq('model', model);
       }
-      if (minPrice) {
-        query = query.gte('price_aed', parseInt(minPrice));
+      if (priceFrom) {
+        query = query.gte('price_aed', parseInt(priceFrom));
       }
-      if (maxPrice) {
-        query = query.lte('price_aed', parseInt(maxPrice));
+      if (priceTo) {
+        query = query.lte('price_aed', parseInt(priceTo));
       }
-      if (minYear) {
-        query = query.gte('year', parseInt(minYear));
+      if (yearFrom) {
+        query = query.gte('year', parseInt(yearFrom));
       }
-      if (maxYear) {
-        query = query.lte('year', parseInt(maxYear));
+      if (yearTo) {
+        query = query.lte('year', parseInt(yearTo));
       }
-      if (maxMileage) {
-        query = query.lte('mileage_km', parseInt(maxMileage));
+      if (mileageFrom) {
+        query = query.gte('mileage_km', parseInt(mileageFrom));
+      }
+      if (mileageTo) {
+        query = query.lte('mileage_km', parseInt(mileageTo));
       }
       if (specs) {
         if (specs === 'GCC') {
           query = query.eq('specs', 'GCC');
-        } else if (specs === 'IMPORTED') {
+        } else if (specs === 'Non-GCC') {
           query = query.neq('specs', 'GCC');
         }
         // If specs is empty (All), no filter
@@ -126,11 +154,12 @@ export default function SearchPage() {
       const params = new URLSearchParams();
       if (make) params.set('make', make);
       if (model) params.set('model', model);
-      if (minPrice) params.set('min_price', minPrice);
-      if (maxPrice) params.set('max_price', maxPrice);
-      if (minYear) params.set('min_year', minYear);
-      if (maxYear) params.set('max_year', maxYear);
-      if (maxMileage) params.set('max_mileage', maxMileage);
+      if (priceFrom) params.set('price_from', priceFrom);
+      if (priceTo) params.set('price_to', priceTo);
+      if (yearFrom) params.set('year_from', yearFrom);
+      if (yearTo) params.set('year_to', yearTo);
+      if (mileageFrom) params.set('mileage_from', mileageFrom);
+      if (mileageTo) params.set('mileage_to', mileageTo);
       if (specs) params.set('specs', specs);
       if (emirate) params.set('emirate', emirate);
       if (freeText) params.set('free_text', freeText);
@@ -145,18 +174,18 @@ export default function SearchPage() {
     };
 
     fetchListings();
-  }, [make, model, minPrice, maxPrice, minYear, maxYear, maxMileage, specs, emirate, freeText, sort, router]);
+  }, [make, model, priceFrom, priceTo, yearFrom, yearTo, mileageFrom, mileageTo, specs, emirate, freeText, sort, router]);
 
   // Fetch listings based on current state (we'll refetch when deps change)
   const [listings, setListings] = useState<Listing[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchListings = async () => {
       setLoading(true);
-      setError(null);
+      setErrorMsg(null);
       const supabase = createClient();
 
       // Start with base query
@@ -169,25 +198,28 @@ export default function SearchPage() {
       if (model) {
         query = query.eq('model', model);
       }
-      if (minPrice) {
-        query = query.gte('price_aed', parseInt(minPrice));
+      if (priceFrom) {
+        query = query.gte('price_aed', parseInt(priceFrom));
       }
-      if (maxPrice) {
-        query = query.lte('price_aed', parseInt(maxPrice));
+      if (priceTo) {
+        query = query.lte('price_aed', parseInt(priceTo));
       }
-      if (minYear) {
-        query = query.gte('year', parseInt(minYear));
+      if (yearFrom) {
+        query = query.gte('year', parseInt(yearFrom));
       }
-      if (maxYear) {
-        query = query.lte('year', parseInt(maxYear));
+      if (yearTo) {
+        query = query.lte('year', parseInt(yearTo));
       }
-      if (maxMileage) {
-        query = query.lte('mileage_km', parseInt(maxMileage));
+      if (mileageFrom) {
+        query = query.gte('mileage_km', parseInt(mileageFrom));
+      }
+      if (mileageTo) {
+        query = query.lte('mileage_km', parseInt(mileageTo));
       }
       if (specs) {
         if (specs === 'GCC') {
           query = query.eq('specs', 'GCC');
-        } else if (specs === 'IMPORTED') {
+        } else if (specs === 'Non-GCC') {
           query = query.neq('specs', 'GCC');
         }
         // If specs is empty (All), no filter
@@ -224,7 +256,7 @@ export default function SearchPage() {
 
       if (error) {
         console.error('Error fetching listings:', error);
-        setError(error.message);
+        setErrorMsg(error.message);
       } else {
         setListings(data || []);
         setTotalCount(count || 0);
@@ -233,29 +265,7 @@ export default function SearchPage() {
     };
 
     fetchListings();
-  }, [make, model, minPrice, maxPrice, minYear, maxYear, maxMileage, specs, emirate, freeText, sort]);
-
-  // Handle make change
-  const handleMakeChange = (newMake: string) => {
-    setMake(newMake);
-    setModel(''); // Reset model when make changes
-  };
-
-  // Handle reset
-  const handleReset = () => {
-    setMake('');
-    setModel('');
-    setMinPrice('');
-    setMaxPrice('');
-    setMinYear('');
-    setMaxYear('');
-    setMaxMileage('');
-    setSpecs('');
-    setEmirate('');
-    setFreeText('');
-    setSort('standard');
-    router.push('/');
-  };
+  }, [make, model, priceFrom, priceTo, yearFrom, yearTo, mileageFrom, mileageTo, specs, emirate, freeText, sort]);
 
   // Active filters for display
   const activeFilters = useMemo(() => {
@@ -278,39 +288,46 @@ export default function SearchPage() {
         remove: () => setModel(''),
       });
     }
-    if (minPrice) {
+    if (priceFrom) {
       filters.push({
-        label: `Min Price: AED ${minPrice}`,
-        value: 'min_price',
-        remove: () => setMinPrice(''),
+        label: `Min Price: AED ${priceFrom}`,
+        value: 'price_from',
+        remove: () => setPriceFrom(''),
       });
     }
-    if (maxPrice) {
+    if (priceTo) {
       filters.push({
-        label: `Max Price: AED ${maxPrice}`,
-        value: 'max_price',
-        remove: () => setMaxPrice(''),
+        label: `Max Price: AED ${priceTo}`,
+        value: 'price_to',
+        remove: () => setPriceTo(''),
       });
     }
-    if (minYear) {
+    if (yearFrom) {
       filters.push({
-        label: `Min Year: ${minYear}`,
-        value: 'min_year',
-        remove: () => setMinYear(''),
+        label: `Min Year: ${yearFrom}`,
+        value: 'year_from',
+        remove: () => setYearFrom(''),
       });
     }
-    if (maxYear) {
+    if (yearTo) {
       filters.push({
-        label: `Max Year: ${maxYear}`,
-        value: 'max_year',
-        remove: () => setMaxYear(''),
+        label: `Max Year: ${yearTo}`,
+        value: 'year_to',
+        remove: () => setYearTo(''),
       });
     }
-    if (maxMileage) {
+    if (mileageFrom) {
       filters.push({
-        label: `Max Mileage: ${maxMileage} km`,
-        value: 'max_mileage',
-        remove: () => setMaxMileage(''),
+        label: `Min Mileage: ${mileageFrom} km`,
+        value: 'mileage_from',
+        remove: () => setMileageFrom(''),
+      });
+    }
+    if (mileageTo) {
+      filters.push({
+        label: `Max Mileage: ${mileageTo} km`,
+        value: 'mileage_to',
+        remove: () => setMileageTo(''),
       });
     }
     if (specs) {
@@ -345,7 +362,7 @@ export default function SearchPage() {
     }
 
     return filters;
-  }, [make, model, minPrice, maxPrice, minYear, maxYear, maxMileage, specs, emirate, freeText, sort]);
+  }, [make, model, priceFrom, priceTo, yearFrom, yearTo, mileageFrom, mileageTo, specs, emirate, freeText, sort]);
 
   return (
     <div className="min-h-screen bg-[#f4f4f4]">
@@ -362,10 +379,7 @@ export default function SearchPage() {
           </Link>
 
           <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="text-sm font-medium text-gray-600 hover:text-gray-800"
-            >
+            <Link href="/" className="text-sm font-medium text-gray-600 hover:text-gray-800">
               Search
             </Link>
             <Link
@@ -444,22 +458,22 @@ export default function SearchPage() {
                   <label className="text-sm font-medium text-gray-700 mb-1 block">Price (AED)</label>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-1">Min</label>
+                      <label className="text-xs font-medium text-gray-600 block mb-1">From</label>
                       <input
                         type="number"
                         placeholder="e.g. 50000"
-                        value={minPrice}
-                        onChange={(e) => setMinPrice(e.target.value)}
+                        value={priceFrom}
+                        onChange={(e) => setPriceFrom(e.target.value)}
                         className="w-full px-4 py-3 rounded border border-slate-300 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-1">Max</label>
+                      <label className="text-xs font-medium text-gray-600 block mb-1">To</label>
                       <input
                         type="number"
                         placeholder="e.g. 500000"
-                        value={maxPrice}
-                        onChange={(e) => setMaxPrice(e.target.value)}
+                        value={priceTo}
+                        onChange={(e) => setPriceTo(e.target.value)}
                         className="w-full px-4 py-3 rounded border border-slate-300 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
                       />
                     </div>
@@ -471,10 +485,10 @@ export default function SearchPage() {
                   <label className="text-sm font-medium text-gray-700 mb-1 block">Year</label>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-1">Min</label>
+                      <label className="text-xs font-medium text-gray-600 block mb-1">From</label>
                       <select
-                        value={minYear}
-                        onChange={(e) => setMinYear(e.target.value)}
+                        value={yearFrom}
+                        onChange={(e) => setYearFrom(e.target.value)}
                         className="w-full px-4 py-3 rounded border border-slate-300 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
                       >
                         <option value="">From</option>
@@ -486,10 +500,10 @@ export default function SearchPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-1">Max</label>
+                      <label className="text-xs font-medium text-gray-600 block mb-1">To</label>
                       <select
-                        value={maxYear}
-                        onChange={(e) => setMaxYear(e.target.value)}
+                        value={yearTo}
+                        onChange={(e) => setYearTo(e.target.value)}
                         className="w-full px-4 py-3 rounded border border-slate-300 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
                       >
                         <option value="">To</option>
@@ -505,19 +519,34 @@ export default function SearchPage() {
 
                 {/* Mileage */}
                 <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">Mileage (km) Max</label>
-                  <select
-                    value={maxMileage}
-                    onChange={(e) => setMaxMileage(e.target.value)}
-                    className="w-full px-4 py-3 rounded border border-slate-300 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
-                  >
-                    <option value="">Max km</option>
-                    {[10000, 30000, 50000, 100000, 150000, 200000, 250000].map((mileage) => (
-                      <option key={mileage} value={mileage.toString()}>
-                        {mileage.toLocaleString()} km
-                      </option>
-                    ))}
-                  </select>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Mileage (km)</label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 block mb-1">From</label>
+                      <select
+                        value={mileageFrom}
+                        onChange={(e) => setMileageFrom(e.target.value)}
+                        className="w-full px-4 py-3 rounded border border-slate-300 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+                      >
+                        {[0].map((mileage) => {
+                          return <option key={mileage} value={mileage.toString()}>
+                            test
+                          </option>;
+                        })</select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 block mb-1">To</label>
+                      <select
+                        value={mileageTo}
+                        onChange={(e) => setMileageTo(e.target.value)}
+                        className="w-full px-4 py-3 rounded border border-slate-300 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+                      >
+                        <option value="">to</option>
+                        <option value="10000">10,000 km</option>
+                        <option value="30000">30,000 km</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Emirate / City */}
@@ -638,7 +667,7 @@ export default function SearchPage() {
                   <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent mx-auto mb-4"></div>
                   <p className="text-slate-600">Loading listings...</p>
                 </div>
-              ) : error ? (
+              ) : errorMsg ? (
                 <div className="text-center py-12">
                   <p className="text-red-600">Error loading listings. Please try again.</p>
                 </div>

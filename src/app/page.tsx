@@ -3,18 +3,20 @@ import { createClient } from '@/lib/supabase/server';
 import { Listing } from '@/types/listing';
 import ListingCard from '@/components/listing/ListingCard';
 import HomeSearchBar from '@/components/search/HomeSearchBar';
-import { Plus, ShieldCheck, Wrench, Phone } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 interface HomePageProps {
   searchParams: Promise<{
-    brand?: string;
+    make?: string;
     model?: string;
-    yearMin?: string;
-    yearMax?: string;
-    mileageMin?: string;
-    mileageMax?: string;
-    priceMin?: string;
-    priceMax?: string;
+    year_from?: string;
+    year_to?: string;
+    mileage_from?: string;
+    mileage_to?: string;
+    price_from?: string;
+    price_to?: string;
+    emirate?: Emirate;
+    specs?: VehicleSpec;
   }>;
 }
 
@@ -25,30 +27,36 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   // Start with base query
   let query = supabase.from('listings').select('*');
 
-  // Apply filters from the search bar
-  if (resolvedParams.brand) {
-    query = query.eq('make', resolvedParams.brand);
+  // Apply filters from the search bar (adjust parameter names to match new HomeSearchBar)
+  if (resolvedParams.make) {
+    query = query.eq('make', resolvedParams.make);
   }
   if (resolvedParams.model) {
     query = query.eq('model', resolvedParams.model);
   }
-  if (resolvedParams.yearMin) {
-    query = query.gte('year', parseInt(resolvedParams.yearMin));
+  if (resolvedParams.year_from) {
+    query = query.gte('year', parseInt(resolvedParams.year_from));
   }
-  if (resolvedParams.yearMax) {
-    query = query.lte('year', parseInt(resolvedParams.yearMax));
+  if (resolvedParams.year_to) {
+    query = query.lte('year', parseInt(resolvedParams.year_to));
   }
-  if (resolvedParams.mileageMin) {
-    query = query.gte('mileage_km', parseInt(resolvedParams.mileageMin));
+  if (resolvedParams.mileage_from) {
+    query = query.gte('mileage_km', parseInt(resolvedParams.mileage_from));
   }
-  if (resolvedParams.mileageMax) {
-    query = query.lte('mileage_km', parseInt(resolvedParams.mileageMax));
+  if (resolvedParams.mileage_to) {
+    query = query.lte('mileage_km', parseInt(resolvedParams.mileage_to));
   }
-  if (resolvedParams.priceMin) {
-    query = query.gte('price_aed', parseInt(resolvedParams.priceMin));
+  if (resolvedParams.price_from) {
+    query = query.gte('price_aed', parseInt(resolvedParams.price_from));
   }
-  if (resolvedParams.priceMax) {
-    query = query.lte('price_aed', parseInt(resolvedParams.priceMax));
+  if (resolvedParams.price_to) {
+    query = query.lte('price_aed', parseInt(resolvedParams.price_to));
+  }
+  if (resolvedParams.emirate) {
+    query = query.eq('emirate', resolvedParams.emirate);
+  }
+  if (resolvedParams.specs) {
+    query = query.eq('specs', resolvedParams.specs);
   }
 
   // Order by newest first
@@ -60,7 +68,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   if (error) {
     console.error('Error fetching listings:', error);
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-[#f4f4f4]">
         <div className="max-w-6xl mx-auto py-12 text-center">
           <p className="text-slate-500">Failed to load listings. Please try again later.</p>
         </div>
@@ -102,113 +110,30 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="py-12">
-        <div className="max-w-6xl mx-auto px-4">
-          {/* Hero Section - mobile.de style */}
-          <section className="relative mb-16">
-            <div className="absolute inset-0">
-              <img
-                src="/hero-car.jpg"
-                alt="Hero car image"
-                className="w-full h-[500px] object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-            </div>
-            <div className="relative z-10 pt-[300px] pb-12 text-center text-white">
-              <h1 className="mb-6 text-4xl font-bold">
-                Drive what fits you.
-              </h1>
-              <p className="mb-8 text-lg max-w-2xl mx-auto">
-                Find the verified car for your lifestyle across Dubai, Abu Dhabi, and the GCC.
-              </p>
-            </div>
-          </section>
+      {/* Main Content - Clean, centered search */}
+      <main className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-[#f4f4f4]">
+        <div className="max-w-4xl w-full px-4 sm:px-6 lg:px-8">
+          {/* Centered Search Card */}
+          <div className="space-y-8">
+            <HomeSearchBar />
 
-          {/* Floating Search Widget - Dual-Card mobile.de layout */}
-          <div className="relative -mb-16">
-            <div className="max-w-6xl mx-auto px-4">
-              <HomeSearchBar />
-            </div>
-          </div>
-
-          {/* Listings Section */}
-          <section className="mb-16">
-            <h2 className="mb-6 text-2xl font-bold text-gray-900">
-              Latest Listings
-            </h2>
-            {typedListings.length > 0 ? (
-              <div className="grid gap-6">
-                {/* Responsive grid: 1 column on mobile, 2 on tablet, 3 on desktop */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {typedListings.map((listing) => (
-                    <ListingCard key={listing.id} listing={listing} />
-                  ))}
+            {/* Optional: Show recent listings below search */}
+            {typedListings.length > 0 && (
+              <>
+                <h2 className="mb-4 text-2xl font-bold text-gray-900">
+                  Featured Listings
+                </h2>
+                <div className="grid gap-6">
+                  {/* Responsive grid: 1 column on mobile, 2 on tablet, 3 on desktop */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {typedListings.slice(0, 6).map((listing) => (
+                      <ListingCard key={listing.id} listing={listing} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <p className="text-slate-500">
-                  No listings match your search criteria. Try adjusting your filters.
-                </p>
-              </div>
+              </>
             )}
-          </section>
-
-          {/* Trust Section - Added warmth and personality */}
-          <section className="text-center py-12 bg-white">
-            <div className="max-w-4xl mx-auto px-6">
-              <h2 className="mb-6 text-xl font-bold text-gray-900">
-                Why Thousands Trust memycar
-              </h2>
-              <div className="grid gap-6 md:grid-cols-3">
-                <div className="bg-white p-6 rounded-lg border border-slate-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
-                  <div className="flex items-center gap-3 mb-4">
-                    <ShieldCheck className="h-5 w-5 text-[#e03a14]" />
-                    <div>
-                      <h3 className="font-semibold text-gray-900">Peace of Mind</h3>
-                      <p className="text-sm text-gray-600">
-                        Every listing undergoes basic verification to ensure authenticity
-                        and transparency in pricing.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-lg border border-slate-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
-                  <div className="flex items-center gap-3 mb-4">
-                    <Wrench className="h-5 w-5 text-green-600" />
-                    <div>
-                      <h3 className="font-semibold text-gray-900">Service History</h3>
-                      <p className="text-sm text-gray-600">
-                        Access complete maintenance records when available - know exactly
-                        what you're buying.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-lg border border-slate-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
-                  <div className="flex items-center gap-3 mb-4">
-                    <Phone className="h-5 w-5 text-purple-600" />
-                    <div>
-                      <h3 className="font-semibold text-gray-900">Direct Connection</h3>
-                      <p className="text-sm text-gray-600">
-                        Connect with sellers instantly through phone or WhatsApp - no middlemen.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Adding a touch of personality/soul */}
-              <div className="mt-8 flex items-center justify-center gap-4 text-sm text-gray-500">
-                <div className="w-0.5 h-0.5 bg-gray-300 rounded-full"></div>
-                <span>Serving the UAE automotive community since 2023</span>
-                <div className="w-0.5 h-0.5 bg-gray-300 rounded-full"></div>
-              </div>
-            </div>
-          </section>
+          </div>
         </div>
       </main>
     </div>

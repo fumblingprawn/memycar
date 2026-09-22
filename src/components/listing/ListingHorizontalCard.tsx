@@ -2,8 +2,9 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Listing, PhotoSlotKey } from '@/types/listing';
+import { Listing } from '@/types/listing';
 import { MapPin, ShieldCheck, Wrench, Globe, Heart } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface ListingHorizontalCardProps {
   listing: Listing;
@@ -21,6 +22,8 @@ const getGrayPlaceholder = () => {
 };
 
 export default function ListingHorizontalCard({ listing }: ListingHorizontalCardProps) {
+  const { locale, dir } = useLanguage();
+
   // Fallback chain for primary image
   const primaryImage =
     (Array.isArray((listing as any).image_urls) && (listing as any).image_urls.length > 0 && (listing as any).image_urls[0]) ||
@@ -31,15 +34,15 @@ export default function ListingHorizontalCard({ listing }: ListingHorizontalCard
 
   const isGcc = listing.specs === 'GCC';
 
-  // Price for display
-  const price = listing.price_aed ?? (listing as any).price ?? 0;
+  // Price for display with proper fallback chain
+  const price = listing.price ?? listing.price_aed ?? 0;
 
   // Service indicator text
   let serviceIndicatorText = '';
   if (listing.last_service_date) {
     const date = new Date(listing.last_service_date);
     const options: Intl.DateTimeFormatOptions = { month: 'short', year: 'numeric' };
-    serviceIndicatorText = `Serviced: ${date.toLocaleDateString(undefined, options)}`;
+    serviceIndicatorText = `Serviced: ${date.toLocaleDateString(locale === 'ar' ? 'ar-US' : undefined, options)}`;
   }
 
   // Call button phone number
@@ -50,10 +53,20 @@ export default function ListingHorizontalCard({ listing }: ListingHorizontalCard
   const isFullAgency = listing.service_history === 'Full Agency';
   const isUnderWarranty = listing.warranty === 'Under Agency Warranty';
 
+  // Get description based on UI language
+  const getDescription = () => {
+    if (locale === 'ar') {
+      return listing.description_ar || listing.description || '';
+    }
+    return listing.description_en || listing.description || '';
+  };
+
   return (
     <Link
       href={`/listing/${listing.id}`}
       className="group block rounded-3xl border border-slate-100 overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white"
+      dir={dir}
+      lang={locale}
     >
       {/* Horizontal Layout */}
       <div className="flex">
@@ -195,7 +208,7 @@ export default function ListingHorizontalCard({ listing }: ListingHorizontalCard
 
           {listing.description && (
             <div className="mt-4">
-              <p className="text-sm text-gray-600 line-clamp-2">{listing.description}</p>
+              <p className="text-sm text-gray-600 line-clamp-2">{getDescription()}</p>
             </div>
           )}
 

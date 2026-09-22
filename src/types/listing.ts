@@ -38,7 +38,9 @@ export interface Listing {
   trim?: string;
   year: number;
   price_aed: number;
+  price?: number; // Alternative price field
   mileage_km: number;
+  mileage?: number; // Alternative mileage field
   specs: VehicleSpec;
   emirate: Emirate;
   body_style?: string;
@@ -49,7 +51,15 @@ export interface Listing {
   seller_name: string;
   seller_phone: string;
   seller_whatsapp: string;
+  whatsapp_number?: string; // Alternative whatsapp field
   description?: string;
+  description_ar?: string; // Arabic description
+  description_en?: string; // English description
+  service_notes?: string;
+  service_notes_ar?: string; // Arabic service notes
+  service_notes_en?: string; // English service notes
+  transmission?: string; // e.g., 'Automatic', 'Manual'
+  fuel_type?: string; // e.g., 'Petrol', 'Diesel', 'Electric', 'Hybrid'
   photos: ListingPhotos;
   is_featured?: boolean;
   is_active?: boolean;
@@ -57,6 +67,5 @@ export interface Listing {
   updated_at?: string;
   // New fields for service history
   last_service_date?: string; // ISO date string
-  service_notes?: string;
   service_record_urls?: string[]; // URLs to files in service-records bucket
 }

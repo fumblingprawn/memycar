@@ -2,14 +2,17 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Listing, PhotoSlotKey } from '@/types/listing';
+import { Listing } from '@/types/listing';
 import { MapPin, ShieldCheck, Wrench, Globe } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface ListingCardProps {
   listing: Listing;
 }
 
 export default function ListingCard({ listing }: ListingCardProps) {
+  const { locale, dir } = useLanguage();
+
   // Fallback chain for primary image
   const primaryImage =
     (Array.isArray((listing as any).image_urls) && (listing as any).image_urls.length > 0 && (listing as any).image_urls[0]) ||
@@ -31,15 +34,15 @@ export default function ListingCard({ listing }: ListingCardProps) {
 
   const isGcc = listing.specs === 'GCC';
 
-  // Price for display
-  const price = listing.price_aed ?? (listing as any).price ?? 0;
+  // Price for display with proper fallback chain
+  const price = listing.price ?? listing.price_aed ?? 0;
 
   // Service indicator text
   let serviceIndicatorText = '';
   if (listing.last_service_date) {
     const date = new Date(listing.last_service_date);
     const options: Intl.DateTimeFormatOptions = { month: 'short', year: 'numeric' };
-    serviceIndicatorText = `Serviced: ${date.toLocaleDateString(undefined, options)}`;
+    serviceIndicatorText = `Serviced: ${date.toLocaleDateString(locale === 'ar' ? 'ar-US' : undefined, options)}`;
   }
 
   // Call button phone number
@@ -50,10 +53,20 @@ export default function ListingCard({ listing }: ListingCardProps) {
   const isFullAgency = listing.service_history === 'Full Agency';
   const isUnderWarranty = listing.warranty === 'Under Agency Warranty';
 
+  // Get description based on UI language
+  const getDescription = () => {
+    if (locale === 'ar') {
+      return listing.description_ar || listing.description || '';
+    }
+    return listing.description_en || listing.description || '';
+  };
+
   return (
     <Link
       href={`/listing/${listing.id}`}
       className="group block rounded-3xl border border-slate-100 overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white"
+      dir={dir}
+      lang={locale}
     >
       {/* 16:9 Standardized Hero Image Container */}
       <div className="relative aspect-[16/9] w-full bg-slate-50 overflow-hidden">
@@ -127,7 +140,7 @@ export default function ListingCard({ listing }: ListingCardProps) {
                 {listing.mileage_km ? Number(listing.mileage_km).toLocaleString() : '0'} km
               </span>
             </div>
-            
+
             {/* Body Style */}
             {listing.body_style && (
               <>
@@ -139,14 +152,14 @@ export default function ListingCard({ listing }: ListingCardProps) {
               </>
             )}
           </div>
-          
+
           <div className="text-sm text-gray-600 flex flex-wrap gap-4">
             {/* Specs */}
             <div className="flex items-center gap-1">
               <Globe className="h-3 w-3 text-gray-400" />
               <span>{listing.specs}</span>
             </div>
-            
+
             {/* Service History */}
             {isFullAgency && (
               <>
@@ -159,7 +172,7 @@ export default function ListingCard({ listing }: ListingCardProps) {
             )}
           </div>
         </div>
-        
+
         {isFullAgency || isUnderWarranty && (
           <div className="mt-4 pt-3 border-t border-slate-100">
             <div className="flex items-center gap-3 text-sm">
@@ -176,10 +189,10 @@ export default function ListingCard({ listing }: ListingCardProps) {
             </div>
           </div>
         )}
-        
+
         {listing.description && (
           <div className="mt-4">
-            <p className="text-sm text-gray-600 line-clamp-2">{listing.description}</p>
+            <p className="text-sm text-gray-600 line-clamp-2">{getDescription()}</p>
           </div>
         )}
       </div>
@@ -202,7 +215,7 @@ export default function ListingCard({ listing }: ListingCardProps) {
               Call Seller
             </button>
           )}
-          
+
           {/* Internal Chat Button (Coming Soon) */}
           <button
             disabled
