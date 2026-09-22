@@ -1,8 +1,10 @@
-import React from 'react';
-import { notFound } from 'next/navigation';
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
 import { Listing, PhotoSlotKey } from '@/types/listing';
+import { createClient } from '@/lib/supabase/client';
 import {
   ArrowLeft,
   MapPin,
@@ -27,21 +29,94 @@ interface ListingDetailPageProps {
   }>;
 }
 
-export default async function ListingDetailPage({ params }: ListingDetailPageProps) {
-  const resolvedParams = await params;
-  const supabase = await createClient();
+export default function ListingDetailPage({ params }: ListingDetailPageProps) {
+  const router = useRouter();
+  const [listing, setListing] = useState<Listing | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const { data: listing, error } = await supabase
-    .from('listings')
-    .select('*')
-    .eq('id', resolvedParams.id)
-    .single();
+  useEffect(() => {
+    let isMounted = true;
+    const fetchListing = async () => {
+      try {
+        const resolvedParams = await params;
+        const id = resolvedParams.id;
+        const supabase = createClient();
 
-  if (error || !listing) {
-    notFound();
+        const { data, error: supabaseError } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (isMounted) {
+          if (supabaseError) {
+            throw supabaseError;
+          }
+          if (!data) {
+            // Listing not found - redirect to not found page
+            router.replace('/not-found');
+            return;
+          }
+          setListing(data as Listing);
+          setError(null);
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          setError(err.message || 'Failed to load listing');
+          setListing(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchListing();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [params, router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent mb-4"></div>
+          <p className="text-slate-600">Loading listing...</p>
+        </div>
+      </div>
+    );
   }
 
-  const typedListing = listing as unknown as Listing;
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600">Error: {error}</p>
+          <Link href="/" className="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700">
+            ← Back to home
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!listing) {
+    // This should not happen because of the redirect above, but just in case
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-slate-600">Listing not found</p>
+          <Link href="/" className="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700">
+            ← Back to home
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   // Field fallbacks as per user request
   const price = ((listing as any).price ?? (listing as any).price_aed ?? 0) as number;
@@ -71,7 +146,7 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
       } else if (typeof val === 'string' && val.length > 0) {
         images.push(val);
       }
-    });
+    );
   }
 
   // Service records
@@ -80,9 +155,9 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
     : [];
 
   const rawWhatsapp = ((listing as any).seller_whatsapp ? (listing as any).seller_whatsapp.replace(/\D/g, '') : '') as string;
-  const listingUrl = `https://memycar.com/listing/${typedListing.id}`;
+  const listingUrl = `https://memycar.com/listing/${listing.id}`;
   const whatsappMsg = encodeURIComponent(
-    `Hi ${typedListing.seller_name || 'there'}, I saw your ${typedListing.year} ${typedListing.make} ${typedListing.model} on memycar.com (${listingUrl}). Is it still available?`
+    `Hi ${listing.seller_name || 'there'}, I saw your ${listing.year} ${listing.make} ${listing.model} on memycar.com (${listingUrl}). Is it still available?`
   );
 
   const [currentIndex, setCurrentIndex] = React.useState(0);
@@ -139,8 +214,8 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              {typedListing.year} {typedListing.make} {typedListing.model}
-              {typedListing.trim ? <span className="text-slate-500 font-medium ml-2 text-xl">{typedListing.trim}</span> : null}
+              {listing.year} {listing.make} {listing.model}
+              {listing.trim ? <span className="text-slate-500 font-medium ml-2 text-xl">{listing.trim}</span> : null}
             </h1>
           </div>
 
@@ -161,13 +236,13 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
                 <>
                   <img
                     src={images[currentIndex]}
-                    alt={`${typedListing.year} ${typedListing.make} ${typedListing.model}}`}
+                    alt={`${listing.year} ${listing.make} ${listing.model}`}
                     className="w-full h-full object-cover"
                     onClick={() => setIsLightboxOpen(true)}
                   />
                   {/* Zoom Overlay Icon */}
                   <button
-                    className="absolute top-2 right-2 p-1 rounded-full bg-white/50 hover:bg-white/700 transition-all"
+                    className="absolute top-2 right-2 p-1 rounded-full bg-white/50 hover:bg-white/700 transaction-all"
                     onClick={(e) => {
                       e.stopPropagation();
                       setIsLightboxOpen(true);
@@ -213,7 +288,7 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
                 Key Vehicle Facts
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3">
+                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3">
                   <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
                     <Gauge className="w-4 h-4" />
                   </div>
@@ -225,234 +300,8 @@ export default async function ListingDetailPage({ params }: ListingDetailPagePro
                   </div>
                 </div>
 
-                <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3">
+                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3">
                   <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
                     <Globe className="w-4 h-4" />
                   </div>
-                  <div>
-                    <span className="text-[11px] text-slate-500 block font-medium">Regional Specs</span>
-                    <span className="text-sm font-bold text-slate-900">{specs}</span>
-                  </div>
                 </div>
-
-                <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600">
-                    <Wrench className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-500 block font-medium">Service History</span>
-                    <span className="text-sm font-bold text-slate-900">{typedListing.service_history ?? 'Not specified'}</span>
-                  </div>
-                </div>
-
-                <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-amber-50 text-amber-600">
-                    <Paintbrush className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-500 block font-medium">Paint Condition</span>
-                    <span className="text-sm font-bold text-slate-900">{typedListing.paint_condition ?? 'Not specified'}</span>
-                  </div>
-                </div>
-
-                <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-purple-50 text-purple-600">
-                    <ShieldCheck className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-500 block font-medium">Warranty</span>
-                    <span className="text-sm font-bold text-slate-900">{typedListing.warranty ?? 'Not specified'}</span>
-                  </div>
-                </div>
-
-                <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-slate-100 text-slate-700">
-                    <KeyRound className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-500 block font-medium">Original Keys</span>
-                    <span className="text-sm font-bold text-slate-900">
-                      {typedListing.keys_count === 2 ? '2 Keys' : '1 Key Only'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {typedListing.description && (
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                <h2 className="text-sm font-bold uppercase tracking-wider text-slate-900 mb-2">
-                  Seller Notes & Details
-                </h2>
-                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">
-                  {typedListing.description}
-                </p>
-              </div>
-            )}
-
-            {/* Service Records & Maintenance */}
-            <div className="mt-6">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-900 mb-3">
-                Service History & Maintenance
-              </h2>
-              {((listing as any).last_service_date) && (
-                <div className="mb-2">
-                  <span className="text-[11px] text-slate-500 block font-medium">Last Service Date:</span>
-                  <span className="text-sm font-bold text-slate-900">{new Date((listing as any).last_service_date).toLocaleDateString()}</span>
-                </div>
-              )}
-              {((listing as any).service_notes) && (
-                <div className="mb-2">
-                  <span className="text-[11px] text-slate-500 block font-medium">Service Notes:</span>
-                  <span className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{(listing as any).service_notes}</span>
-                </div>
-              )}
-              {serviceRecords.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-900 mb-2">Service Records</h3>
-                  <div className="space-y-2">
-                    {serviceRecords.map((url: string, index: number) => (
-                      <div key={index} className="flex items-center">
-                        <Wrench className="mr-2 h-4 w-4 text-slate-500" />
-                        <a
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-slate-600 hover:underline"
-                        >
-                          Record {index + 1}
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="hidden lg:block space-y-4">
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm sticky top-24">
-              <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider block mb-1">
-                Direct Seller Contact
-              </span>
-              <h3 className="text-lg font-bold text-slate-900 mb-1">{typedListing.seller_name || 'Vehicle Owner'}</h3>
-              <p className="text-xs text-slate-500 mb-6 flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                {city}, UAE
-              </p>
-
-              <div className="space-y-3">
-                <a
-                  href={`https://wa.me/${rawWhatsapp}?text=${whatsappMsg}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  WhatsApp Seller
-                </a>
-
-                {phone && (
-                  <a
-                    href={`tel:${phone}`}
-                    className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-3 px-4 rounded-xl transition"
-                  >
-                    <Phone className="w-4 h-4" />
-                    Call {phone}
-                  </a>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-
-      {/* Lightbox Modal */}
-      {isLightboxOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-[90vw] max-h-[90vh]">
-            {/* Lightbox Close Button */}
-            <button
-              className="absolute top-2 right-2 z-10 p-2 rounded-full bg-white/20 hover:bg-white/300 transition-all"
-              onClick={() => setIsLightboxOpen(false)}
-              aria-label="Close lightbox"
-            >
-              <X className="h-5 w-5 text-white" />
-            </button>
-
-            {/* Lightbox Navigation Arrows */}
-            <button
-              className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-white/20 hover:bg-white/300 transition-all disabled:opacity-20`}
-              onClick={() => setCurrentIndex((prev) => (prev - 1 + images.length) % images.length)}
-              disabled={images.length <= 1}
-              aria-label="Previous image"
-            >
-              <ChevronsLeft className="h-5 w-5 text-white" />
-            </button>
-            <button
-              className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-white/20 hover:bg-white/300 transition-all disabled:opacity-20`}
-              onClick={() => setCurrentIndex((prev) => (prev + 1) % images.length)}
-              disabled={images.length <= 1}
-              aria-label="Next image"
-            >
-              <ChevronsRight className="h-5 w-5 text-white" />
-            </button>
-
-            {/* Lightbox Image with Zoom Toggle */}
-            <div
-              className={`relative w-full h-full flex items-center justify-center ${isZoomed ? 'overflow-auto' : 'overflow-hidden'}`}
-              onDoubleClick={() => setIsZoomed((prev) => !prev)}
-            >
-              <img
-                src={images[currentIndex]}
-                alt={`${typedListing.year} ${typedListing.make} ${typedListing.model}}`}
-                className={`${isZoomed ? 'cursor-zoom-out' : 'cursor-zoom-in'} transition-transform
-                ${isZoomed ? 'max-none' : 'max-w-full max-h-full'} object-contain`}
-                onClick={() => setIsZoomed((prev) => !prev)}
-              />
-            </div>
-
-            {/* Zoom Toggle Button */}
-            <button
-              className="absolute bottom-2 right-2 z-10 p-2 rounded-full bg-white/20 hover:bg-white/300 transition-all"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsZoomed((prev) => !prev);
-              }}
-              aria-label={isZoomed ? 'Zoom out' : 'Zoom in'}
-            >
-              {isZoomed ? (
-                <ZoomOut className="h-5 w-5 text-white" />
-              ) : (
-                <ZoomIn className="h-5 w-5 text-white" />
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-3 shadow-lg">
-        <div className="max-w-md mx-auto flex items-center gap-3">
-          {phone && (
-            <a
-              href={`tel:${phone}`}
-              className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl transition flex items-center justify-center"
-              aria-label="Call seller"
-            >
-              <Phone className="w-5 h-5" />
-            </a>
-          )}
-          <a
-            href={`https://wa.me/${rawWhatsapp}?text=${whatsappMsg}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 active:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition"
-          >
-            <MessageCircle className="w-5 h-5" />
-            WhatsApp Seller
-          </a>
-        </div>
-      </div>
-    </div>
-  );
-}

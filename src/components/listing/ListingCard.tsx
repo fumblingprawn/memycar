@@ -123,7 +123,9 @@ export default function ListingCard({ listing }: ListingCardProps) {
             {/* Mileage */}
             <div className="flex items-center gap-1">
               <Wrench className="h-3 w-3 text-gray-400" />
-              <span>{Number(listing.mileage_km).toLocaleString()} km</span>
+              <span>
+                {listing.mileage_km ? Number(listing.mileage_km).toLocaleString() : '0'} km
+              </span>
             </div>
             
             {/* Body Style */}
