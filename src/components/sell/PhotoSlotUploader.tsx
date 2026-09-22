@@ -35,6 +35,10 @@ export default function PhotoSlotUploader({ onChange }: PhotoSlotUploaderProps) 
   const [extras, setExtras] = useState<File[]>([]);
   const [extraPreviews, setExtraPreviews] = useState<string[]>([]);
   const [compressing, setCompressing] = useState<string | null>(null);
+  const [urlInputs, setUrlInputs] = useState<Partial<Record<PhotoSlotKey, string>>>({});
+  const [editingUrlSlot, setEditingUrlSlot] = useState<PhotoSlotKey | null>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [activeCameraSlot, setActiveCameraSlot] = useState<PhotoSlotKey | null>(null);
 
   const compress = async (file: File): Promise<File> => {
     return await imageCompression(file, {
