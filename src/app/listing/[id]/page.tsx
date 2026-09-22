@@ -1,307 +1,333 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Listing, PhotoSlotKey } from '@/types/listing';
 import { createClient } from '@/lib/supabase/client';
-import {
-  ArrowLeft,
-  MapPin,
-  ShieldCheck,
-  Wrench,
-  Paintbrush,
-  KeyRound,
-  Gauge,
-  Globe,
-  Phone,
-  MessageCircle,
-  ChevronsLeft,
-  ChevronsRight,
-  X,
-  ZoomIn,
-  ZoomOut
-} from 'lucide-react';
 
-interface ListingDetailPageProps {
-  params: Promise<{
-    id: string;
-  }>;
-}
-
-export default function ListingDetailPage({ params }: ListingDetailPageProps) {
+export default function ListingDetailPage() {
+  const params = useParams();
   const router = useRouter();
-  const [listing, setListing] = useState<Listing | null>(null);
+  const supabase = createClient();
+
+  const [listing, setListing] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [isZoomed, setIsZoomed] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
-    const fetchListing = async () => {
+    async function fetchListing() {
+      if (!params?.id) return;
       try {
-        const resolvedParams = await params;
-        const id = resolvedParams.id;
-        const supabase = createClient();
-
-        const { data, error: supabaseError } = await supabase
+        const { data, error } = await supabase
           .from('listings')
           .select('*')
-          .eq('id', id)
+          .eq('id', params.id)
           .single();
 
-        if (isMounted) {
-          if (supabaseError) {
-            throw supabaseError;
-          }
-          if (!data) {
-            // Listing not found - redirect to not found page
-            router.replace('/not-found');
-            return;
-          }
-          setListing(data as Listing);
-          setError(null);
-        }
-      } catch (err: any) {
-        if (isMounted) {
-          setError(err.message || 'Failed to load listing');
-          setListing(null);
-        }
+        if (error) throw error;
+        setListing(data);
+      } catch (err) {
+        console.error('Failed to load listing:', err);
       } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
-    };
-
+    }
     fetchListing();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [params, router]);
+  }, [params?.id, supabase]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent mb-4"></div>
-          <p className="text-slate-600">Loading listing...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600">Error: {error}</p>
-          <Link href="/" className="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700">
-            ← Back to home
-          </Link>
+          <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#e03a14] border-t-transparent mx-auto mb-3"></div>
+          <p className="text-sm font-semibold text-slate-600">Loading car details...</p>
         </div>
       </div>
     );
   }
 
   if (!listing) {
-    // This should not happen because of the redirect above, but just in case
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-slate-600">Listing not found</p>
-          <Link href="/" className="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700">
-            ← Back to home
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center max-w-md">
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Listing Not Found</h2>
+          <p className="text-sm text-slate-500 mb-6">This vehicle may have been sold or removed.</p>
+          <Link
+            href="/"
+            className="inline-block bg-[#e03a14] hover:bg-[#c53210] text-white px-6 py-2.5 rounded-xl font-bold text-sm transition"
+          >
+            Back to Search
           </Link>
         </div>
       </div>
     );
   }
 
-  // Field fallbacks as per user request
-  const price = ((listing as any).price ?? (listing as any).price_aed ?? 0) as number;
-  const mileage = ((listing as any).mileage ?? (listing as any).mileage_km ?? 0) as number;
-  const city = ((listing as any).city || (listing as any).emirate || 'Dubai') as string;
-  const specs = ((listing as any).specs || (listing as any).spec || 'GCC Specs') as string;
-  const phone = ((listing as any).seller_phone || (listing as any).whatsapp_number || '') as string;
+  // Safe field fallbacks
+  const price = listing.price ?? listing.price_aed ?? 0;
+  const mileage = listing.mileage ?? listing.mileage_km ?? 0;
+  const city = listing.city || listing.emirate || 'Dubai';
+  const specs = listing.specs || listing.spec || 'GCC Specs';
+  const phone = listing.seller_phone || listing.whatsapp_number || '';
 
-  // Image array handling as per user request
-  let images: string[] = [];
-  const image_urls = (listing as any).image_urls;
-  const imagesArr = (listing as any).images;
-  const photosObj = (listing as any).photos;
-  if (Array.isArray(image_urls) && image_urls.length > 0) {
-    images = image_urls.filter((url: any): url is string => typeof url === 'string' && url.length > 0);
-  } else if (Array.isArray(imagesArr)) {
-    images = imagesArr.filter((url: any): url is string => typeof url === 'string' && url.length > 0);
-  } else if (photosObj && typeof photosObj === 'object') {
-    const photosObjCast = photosObj as Record<string, any>;
-    Object.values(photosObjCast).forEach((val) => {
-      if (Array.isArray(val)) {
-        val.forEach((url: any) => {
-          if (typeof url === 'string' && url.length > 0) {
-            images.push(url);
-          }
-        });
-      } else if (typeof val === 'string' && val.length > 0) {
+  // Safe image gathering
+  const images: string[] = [];
+  if (Array.isArray(listing.image_urls) && listing.image_urls.length > 0) {
+    images.push(...listing.image_urls);
+  } else if (Array.isArray(listing.images) && listing.images.length > 0) {
+    images.push(...listing.images);
+  } else if (listing.photos && typeof listing.photos === 'object') {
+    Object.values(listing.photos).forEach((val) => {
+      if (typeof val === 'string' && val.startsWith('http')) {
         images.push(val);
       }
-    );
+    });
   }
 
-  // Service records
-  const serviceRecords = Array.isArray((listing as any).service_record_urls)
-    ? ((listing as any).service_record_urls).filter((url: any): url is string => typeof url === 'string' && url.length > 0)
-    : [];
-
-  const rawWhatsapp = ((listing as any).seller_whatsapp ? (listing as any).seller_whatsapp.replace(/\D/g, '') : '') as string;
-  const listingUrl = `https://memycar.com/listing/${listing.id}`;
-  const whatsappMsg = encodeURIComponent(
-    `Hi ${listing.seller_name || 'there'}, I saw your ${listing.year} ${listing.make} ${listing.model} on memycar.com (${listingUrl}). Is it still available?`
-  );
-
-  const [currentIndex, setCurrentIndex] = React.useState(0);
-  const [isLightboxOpen, setIsLightboxOpen] = React.useState(false);
-  const [isZoomed, setIsZoomed] = React.useState(false);
-
-  // Lightbox keyboard navigation
-  React.useEffect(() => {
-    if (!isLightboxOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsLightboxOpen(false);
-      } else if (e.key === 'ArrowLeft') {
-        setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
-      } else if (e.key === 'ArrowRight') {
-        setCurrentIndex((prev) => (prev + 1) % images.length);
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isLightboxOpen, images.length, currentIndex]);
+  const activeImage = images[activeImageIndex] || null;
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-28 sm:pb-16">
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 transition"
+    <div className="min-h-screen bg-slate-50 py-6 md:py-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Navigation Breadcrumb */}
+        <div className="mb-4">
+          <button
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
           >
-            <ArrowLeft className="w-4 h-4" />
-            Back to search
-          </Link>
-          <span className="font-bold text-sm tracking-tight text-slate-900">
-            memycar<span className="text-blue-600">.com</span>
-          </span>
+            ← Back to search
+          </button>
         </div>
-      </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+        {/* Title Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <span className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                specs === 'GCC'
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : 'bg-slate-200 text-slate-800'
-              }`}>
-                {specs === 'GCC' ? '🇦🇪 GCC Specs' : `${specs} Specs`}
+              <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-0.5 rounded-md uppercase">
+                {specs}
               </span>
-              <span className="text-xs text-slate-500 flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                {city}, UAE
-              </span>
+              <span className="text-xs font-medium text-slate-500">{city}, UAE</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              {listing.year} {listing.make} {listing.model}
-              {listing.trim ? <span className="text-slate-500 font-medium ml-2 text-xl">{listing.trim}</span> : null}
+            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
+              {listing.year} {listing.make} {listing.model} {listing.trim || ''}
             </h1>
           </div>
 
           <div className="text-left md:text-right">
-            <span className="text-xs text-slate-500 uppercase tracking-wider block font-medium">Asking Price</span>
-            <span className="text-2xl sm:text-3xl font-black text-blue-600 tracking-tight">
-              AED {price.toLocaleString()}
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Asking Price</span>
+            <span className="text-2xl md:text-3xl font-black text-[#e03a14]">
+              AED {Number(price).toLocaleString()}
             </span>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-2 sm:p-3 shadow-sm border border-slate-200 mb-8">
-          {/* Image Gallery with Lightbox */}
-          <div className="relative">
-            {/* Main Image */}
-            <div className="relative aspect-[16/9] w-full rounded-xl overflow-hidden bg-slate-950">
-              {images.length > 0 ? (
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column: Photos & Details */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Main Featured Photo Box */}
+            <div className="bg-slate-900 rounded-2xl overflow-hidden shadow-sm relative group aspect-[16/9] flex items-center justify-center">
+              {activeImage ? (
                 <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={images[currentIndex]}
-                    alt={`${listing.year} ${listing.make} ${listing.model}`}
-                    className="w-full h-full object-cover"
-                    onClick={() => setIsLightboxOpen(true)}
-                  />
-                  {/* Zoom Overlay Icon */}
-                  <button
-                    className="absolute top-2 right-2 p-1 rounded-full bg-white/50 hover:bg-white/700 transaction-all"
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    src={activeImage}
+                    alt={listing.title || `${listing.make} ${listing.model}`}
+                    onClick={() => {
                       setIsLightboxOpen(true);
+                      setIsZoomed(false);
                     }}
-                  >
-                    <ZoomIn className="h-4 w-4 text-slate-900" />
-                  </button>
+                    className="w-full h-full object-contain cursor-zoom-in group-hover:scale-[1.01] transition duration-200"
+                  />
+                  <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 pointer-events-none">
+                    <span>🔍 Click to inspect & zoom</span>
+                  </div>
                 </>
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm">
-                  No preview image available
+                <div className="text-center p-8 text-slate-400">
+                  <p className="text-sm">No preview image available</p>
                 </div>
               )}
             </div>
 
             {/* Thumbnail Strip */}
             {images.length > 1 && (
-              <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
-                {images.map((url, index) => (
-                  <div
-                    key={index}
-                    className={`relative flex-shrink-0 w-24 aspect-[16/9] rounded-lg overflow-hidden border border-slate-200 ${
-                      currentIndex === index ? 'ring-2 ring-blue-500' : ''
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {images.map((img, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setActiveImageIndex(idx)}
+                    className={`relative flex-shrink-0 w-20 h-14 rounded-lg overflow-hidden border-2 transition ${
+                      activeImageIndex === idx ? 'border-[#e03a14]' : 'border-transparent opacity-70 hover:opacity-100'
                     }`}
                   >
-                    <img
-                      src={url}
-                      alt={`Angle ${index + 1}`}
-                      className="w-full h-full object-cover"
-                      onClick={() => setCurrentIndex(index)}
-                    />
-                  </div>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={img} alt={`Thumb ${idx}`} className="w-full h-full object-cover" />
+                  </button>
                 ))}
               </div>
             )}
+
+            {/* Key Vehicle Facts */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-4">Key Vehicle Facts</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="bg-slate-50 p-3 rounded-xl">
+                  <span className="text-xs text-slate-400 block mb-0.5">Year</span>
+                  <span className="text-sm font-bold text-slate-900">{listing.year}</span>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-xl">
+                  <span className="text-xs text-slate-400 block mb-0.5">Mileage</span>
+                  <span className="text-sm font-bold text-slate-900">{Number(mileage).toLocaleString()} km</span>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-xl">
+                  <span className="text-xs text-slate-400 block mb-0.5">Regional Specs</span>
+                  <span className="text-sm font-bold text-slate-900">{specs}</span>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-xl">
+                  <span className="text-xs text-slate-400 block mb-0.5">City</span>
+                  <span className="text-sm font-bold text-slate-900">{city}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Service & Maintenance History */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-3">Service & Maintenance History</h2>
+              {listing.last_service_date ? (
+                <div className="mb-3">
+                  <span className="inline-block bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-md border border-emerald-200">
+                    ✓ Last Serviced: {listing.last_service_date}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 mb-3">No specific service date recorded.</p>
+              )}
+
+              {listing.service_notes && (
+                <div className="bg-slate-50 p-4 rounded-xl text-xs leading-relaxed text-slate-700 mb-4">
+                  <p className="font-semibold text-slate-900 mb-1">Maintenance Notes:</p>
+                  {listing.service_notes}
+                </div>
+              )}
+
+              {Array.isArray(listing.service_record_urls) && listing.service_record_urls.length > 0 && (
+                <div>
+                  <span className="text-xs font-semibold text-slate-600 block mb-2">Verified Documents:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {listing.service_record_urls.map((url: string, i: number) => (
+                      <a
+                        key={i}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-200 transition"
+                      >
+                        📄 Document #{i + 1}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Description */}
+            {listing.description && (
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-3">Seller Description</h2>
+                <p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">{listing.description}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column: Contact & Safety */}
+          <div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm sticky top-24 space-y-4">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">Direct Seller Contact</span>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">{listing.seller_name || 'Vehicle Owner'}</h3>
+                <p className="text-xs text-slate-500">{city}, UAE</p>
+              </div>
+
+              {phone ? (
+                <a
+                  href={`tel:${phone}`}
+                  className="w-full bg-[#e03a14] hover:bg-[#c53210] text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow transition"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  Call {phone}
+                </a>
+              ) : (
+                <button disabled className="w-full bg-slate-200 text-slate-400 py-3.5 px-4 rounded-xl font-bold text-sm">
+                  Phone Not Available
+                </button>
+              )}
+
+              <button
+                disabled
+                className="w-full bg-slate-100 text-slate-400 font-bold py-3 px-4 rounded-xl text-xs cursor-not-allowed border border-slate-200"
+              >
+                Internal Chat (Coming Soon)
+              </button>
+
+              <div className="pt-4 border-t border-slate-100 text-[11px] text-slate-400 space-y-1">
+                <p className="font-semibold text-slate-600">Buyer Safety Reminder:</p>
+                <p>Always inspect the car and verify the Mulkiya (registration) in person before transferring any funds.</p>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
-            <div>
-              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-900 mb-3">
-                Key Vehicle Facts
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
-                    <Gauge className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-500 block font-medium">Mileage</span>
-                    <span className="text-sm font-bold text-slate-900">
-                      {mileage.toLocaleString()} km
-                    </span>
-                  </div>
-                </div>
+      {/* Lightbox High-Resolution Zoom Modal */}
+      {isLightboxOpen && activeImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4"
+          onClick={() => setIsLightboxOpen(false)}
+        >
+          <div className="absolute top-4 right-4 flex items-center gap-3 z-10">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsZoomed(!isZoomed);
+              }}
+              className="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-semibold backdrop-blur-sm transition"
+            >
+              {isZoomed ? 'Reset Zoom' : '2x Zoom In'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsLightboxOpen(false)}
+              className="bg-white/10 hover:bg-white/20 text-white w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold backdrop-blur-sm transition"
+            >
+              ✕
+            </button>
+          </div>
 
-                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
-                    <Globe className="w-4 h-4" />
-                  </div>
-                </div>
+          <div
+            className={`max-w-5xl max-h-[85vh] overflow-auto transition-transform duration-200 ${
+              isZoomed ? 'scale-150 cursor-zoom-out' : 'cursor-zoom-in'
+            }`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsZoomed(!isZoomed);
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={activeImage}
+              alt="Enlarged view"
+              className="max-h-[85vh] w-auto mx-auto object-contain select-none"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
