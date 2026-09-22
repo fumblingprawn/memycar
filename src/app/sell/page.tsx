@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { carData, years } from '@/lib/constants/car-data';
-import { UploadCloud, CheckCircle2, ChevronRight, Car, Camera, FileText, User } from 'lucide-react';
+import PhotoSlotUploader from '@/components/sell/PhotoSlotUploader';
+import { PhotoSlotKey } from '@/types/listing';
+import { CheckCircle2, ChevronRight, Car, Camera, FileText, User } from 'lucide-react';
 
 export default function SellPage() {
   const router = useRouter();
@@ -14,7 +16,6 @@ export default function SellPage() {
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Form State
   const [formData, setFormData] = useState({
     make: '',
     model: '',
@@ -28,30 +29,55 @@ export default function SellPage() {
     transmission: 'Automatic',
     fuel_type: 'Petrol',
     description: '',
-    has_agency_history: true,
     last_service_date: '',
     service_notes: '',
     seller_name: '',
     seller_phone: '',
   });
 
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
-  const [newImageUrl, setNewImageUrl] = useState('');
+  const [photoSlots, setPhotoSlots] = useState<Record<PhotoSlotKey, File | null>>({
+    front_three_quarter: null,
+    rear_three_quarter: null,
+    side_profile: null,
+    interior_dash: null,
+    odometer: null,
+  });
+  const [extraPhotos, setExtraPhotos] = useState<File[]>([]);
+  const [directUrls, setDirectUrls] = useState<Record<string, string>>({});
 
   const emirateOptions = ['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain'];
   const availableModels = formData.make
     ? carData.makes.find((m) => m.make.toLowerCase() === formData.make.toLowerCase())?.models || []
     : [];
 
-  const handleAddImage = () => {
-    if (newImageUrl.trim() && newImageUrl.startsWith('http')) {
-      setImageUrls((prev) => [...prev, newImageUrl.trim()]);
-      setNewImageUrl('');
-    }
+  const handlePhotosChange = (
+    slots: Record<PhotoSlotKey, File | null>,
+    extras: File[],
+    urls: Record<string, string>
+  ) => {
+    setPhotoSlots(slots);
+    setExtraPhotos(extras);
+    setDirectUrls(urls);
   };
 
-  const handleRemoveImage = (index: number) => {
-    setImageUrls((prev) => prev.filter((_, idx) => idx !== index));
+  const uploadFileToSupabase = async (file: File): Promise<string> => {
+    const filename = `${Date.now()}_${Math.random().toString(36).substring(7)}.webp`;
+    const { error } = await supabase.storage.from('car-photos').upload(filename, file, {
+      contentType: 'image/webp',
+      upsert: true,
+    });
+
+    if (error) {
+      // Fallback: convert file to a local Data URL if bucket is not configured yet
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    const { data: publicData } = supabase.storage.from('car-photos').getPublicUrl(filename);
+    return publicData.publicUrl;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -60,6 +86,25 @@ export default function SellPage() {
     setErrorMsg(null);
 
     try {
+      const uploadedUrls: string[] = [];
+
+      // 1. Process 5 standardized slots
+      for (const key of Object.keys(photoSlots) as PhotoSlotKey[]) {
+        const file = photoSlots[key];
+        if (file) {
+          const url = await uploadFileToSupabase(file);
+          uploadedUrls.push(url);
+        } else if (directUrls[key]) {
+          uploadedUrls.push(directUrls[key]);
+        }
+      }
+
+      // 2. Process extra files
+      for (const extra of extraPhotos) {
+        const url = await uploadFileToSupabase(extra);
+        uploadedUrls.push(url);
+      }
+
       const payload = {
         make: formData.make,
         model: formData.model,
@@ -77,7 +122,7 @@ export default function SellPage() {
         service_notes: formData.service_notes || null,
         seller_name: formData.seller_name || 'Vehicle Owner',
         seller_phone: formData.seller_phone || null,
-        image_urls: imageUrls,
+        image_urls: uploadedUrls,
       };
 
       const { data, error } = await supabase.from('listings').insert([payload]).select();
@@ -98,7 +143,7 @@ export default function SellPage() {
   return (
     <div className="min-h-screen bg-[#f4f4f4] py-10">
       <div className="max-w-3xl mx-auto px-4">
-        {/* Title Card */}
+        {/* Title */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-6">
           <h1 className="text-2xl font-black text-slate-900">List Your Vehicle</h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -110,7 +155,7 @@ export default function SellPage() {
           <div className="bg-white rounded-2xl border border-emerald-200 p-8 shadow-sm text-center">
             <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
             <h2 className="text-xl font-bold text-slate-900 mb-1">Vehicle Listed Successfully!</h2>
-            <p className="text-xs text-slate-500">Redirecting to your live vehicle page...</p>
+            <p className="text-xs text-slate-500">Redirecting to your vehicle page...</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -265,7 +310,7 @@ export default function SellPage() {
                 <label className="text-xs font-semibold text-slate-700 block mb-1">Vehicle Description</label>
                 <textarea
                   rows={4}
-                  placeholder="Detail options, condition, service history, and warranties..."
+                  placeholder="Detail options, condition, and warranties..."
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
@@ -273,47 +318,13 @@ export default function SellPage() {
               </div>
             </div>
 
-            {/* STEP 2: PHOTOS */}
+            {/* STEP 2: PHOTOS (Standardized 5 Angles + Wireframe Guide) */}
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <Camera className="w-4 h-4 text-[#e03a14]" />
-                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Step 2: Photos</h2>
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Step 2: Vehicle Photos</h2>
               </div>
-
-              <div className="flex gap-2">
-                <input
-                  type="url"
-                  placeholder="Paste image URL (https://...)"
-                  value={newImageUrl}
-                  onChange={(e) => setNewImageUrl(e.target.value)}
-                  className="flex-1 px-3 py-2 text-sm rounded-xl border border-slate-300"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddImage}
-                  className="bg-slate-900 hover:bg-black text-white px-4 py-2 rounded-xl text-xs font-bold transition"
-                >
-                  Add Image
-                </button>
-              </div>
-
-              {imageUrls.length > 0 && (
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 pt-2">
-                  {imageUrls.map((url, idx) => (
-                    <div key={idx} className="relative group rounded-xl overflow-hidden aspect-[4/3] border border-slate-200">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt={`Car ${idx}`} className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveImage(idx)}
-                        className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600 transition"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <PhotoSlotUploader onChange={handlePhotosChange} />
             </div>
 
             {/* STEP 3: SERVICE HISTORY */}
@@ -337,7 +348,7 @@ export default function SellPage() {
                   <label className="text-xs font-semibold text-slate-700 block mb-1">Maintenance Notes</label>
                   <input
                     type="text"
-                    placeholder="e.g. Major service completed at 40k km"
+                    placeholder="e.g. Major service at agency, new brakes"
                     value={formData.service_notes}
                     onChange={(e) => setFormData({ ...formData, service_notes: e.target.value })}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
@@ -346,7 +357,7 @@ export default function SellPage() {
               </div>
             </div>
 
-            {/* STEP 4: SELLER CONTACT */}
+            {/* STEP 4: SELLER DETAILS */}
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <User className="w-4 h-4 text-[#e03a14]" />
@@ -382,9 +393,9 @@ export default function SellPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#e03a14] hover:bg-[#c53210] disabled:bg-slate-400 text-white font-bold py-3.5 px-6 rounded-xl transition text-sm flex items-center justify-center gap-2"
+              className="w-full bg-[#e03a14] hover:bg-[#c53210] disabled:bg-slate-400 text-white font-bold py-3.5 px-6 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-sm"
             >
-              {loading ? 'Publishing Vehicle...' : 'Publish Listing'}
+              {loading ? 'Processing & Publishing...' : 'Publish Listing'}
               <ChevronRight className="w-4 h-4" />
             </button>
           </form>
