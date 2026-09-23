@@ -1,6 +1,12 @@
 export type Locale = 'en' | 'ar';
 
 export const DICTIONARY: Record<string, { en: string; ar: string }> = {
+  // Chat Media & Realtime
+  "attachImage": { en: "Attach Image", ar: "إرفاق صورة" },
+  "uploadingImage": { en: "Uploading image...", ar: "جاري رفع الصورة..." },
+  "imageAttachment": { en: "Photo attachment", ar: "صورة مرفقة" },
+  "onlineNow": { en: "Live Realtime Active", ar: "متصل الآن (محادثة مباشرة)" },
+
   // Messaging & Chat
   "messageSeller": { en: "Message Seller", ar: "مراسلة البائع" },
   "messages": { en: "Messages", ar: "الرسائل" },

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, Suspense } from 'react';
+import React, { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -21,7 +21,10 @@ import {
   Loader2,
   Lock,
   MessageSquare,
-  Send
+  Send,
+  Paperclip,
+  Image as ImageIcon,
+  X
 } from 'lucide-react';
 
 function DashboardContent() {
@@ -47,16 +50,25 @@ function DashboardContent() {
   const [profileSuccess, setProfileSuccess] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
 
-  // Messaging State
+  // Messaging & Realtime State
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConv, setSelectedConv] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [sendingMsg, setSendingMsg] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Account Deletion
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const fetchUserData = useCallback(async () => {
     setLoading(true);
@@ -131,7 +143,7 @@ function DashboardContent() {
     fetchUserData();
   }, [fetchUserData]);
 
-  // Load chat messages when selected conversation changes
+  // Real-time Chat Subscription (WebSocket)
   useEffect(() => {
     if (!selectedConv) return;
 
@@ -142,19 +154,32 @@ function DashboardContent() {
         .eq('conversation_id', selectedConv.id)
         .order('created_at', { ascending: true });
 
-      if (data) setMessages(data);
+      if (data) {
+        setMessages(data);
+        setTimeout(scrollToBottom, 100);
+      }
     }
 
     loadMessages();
 
-    // Subscribe to new messages
+    // Setup active WebSocket channel for instant incoming messages
     const channel = supabase
-      .channel(`conv_${selectedConv.id}`)
+      .channel(`realtime_chat_${selectedConv.id}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedConv.id}` },
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages', 
+          filter: `conversation_id=eq.${selectedConv.id}` 
+        },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new]);
+          setMessages((prev) => {
+            // Avoid duplicates from optimistic updates
+            if (prev.some((m) => m.id === payload.new.id)) return prev;
+            return [...prev, payload.new];
+          });
+          setTimeout(scrollToBottom, 100);
         }
       )
       .subscribe();
@@ -164,36 +189,113 @@ function DashboardContent() {
     };
   }, [selectedConv, supabase]);
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setFilePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const removeSelectedFile = () => {
+    setSelectedFile(null);
+    if (filePreview) URL.revokeObjectURL(filePreview);
+    setFilePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedConv || !user) return;
+    if ((!newMessage.trim() && !selectedFile) || !selectedConv || !user) return;
 
     setSendingMsg(true);
     const text = newMessage.trim();
     setNewMessage('');
 
+    let uploadedImageUrl: string | null = null;
+
     try {
-      const { error: msgErr } = await supabase.from('messages').insert({
+      // 1. If an image is attached, upload to Supabase Storage
+      if (selectedFile) {
+        setUploadingImage(true);
+        const fileExt = selectedFile.name.split('.').pop() || 'jpg';
+        const fileName = `${selectedConv.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from('chat-attachments')
+          .upload(fileName, selectedFile, {
+            contentType: selectedFile.type,
+            upsert: false
+          });
+
+        if (uploadErr) {
+          console.warn('Storage upload error, falling back:', uploadErr);
+        } else {
+          const { data: publicUrlData } = supabase.storage
+            .from('chat-attachments')
+            .getPublicUrl(fileName);
+          uploadedImageUrl = publicUrlData.publicUrl;
+        }
+        removeSelectedFile();
+        setUploadingImage(false);
+      }
+
+      // Optimistic message placeholder
+      const tempId = `temp_${Date.now()}`;
+      const optimisticMsg = {
+        id: tempId,
         conversation_id: selectedConv.id,
         sender_id: user.id,
-        content: text,
-      });
+        content: text || (uploadedImageUrl ? (isAr ? '📷 صورة مرفقة' : '📷 Photo attachment') : ''),
+        image_url: uploadedImageUrl,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, optimisticMsg]);
+      setTimeout(scrollToBottom, 50);
+
+      // 2. Insert to Supabase Messages
+      const { data: inserted, error: msgErr } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: selectedConv.id,
+          sender_id: user.id,
+          content: text || (uploadedImageUrl ? (isAr ? '📷 صورة مرفقة' : '📷 Photo attachment') : ''),
+          image_url: uploadedImageUrl,
+        })
+        .select()
+        .single();
 
       if (msgErr) throw msgErr;
 
-      // Update conversation last message timestamp
+      // Replace optimistic message with confirmed row
+      if (inserted) {
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? inserted : m)));
+      }
+
+      // 3. Update parent conversation last message
+      const summaryText = text || (isAr ? '📷 أرسل صورة' : '📷 Sent a photo');
       await supabase
         .from('conversations')
         .update({
-          last_message: text,
+          last_message: summaryText,
           last_message_at: new Date().toISOString(),
         })
         .eq('id', selectedConv.id);
+
+      // Update sidebar summary immediately
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === selectedConv.id
+            ? { ...c, last_message: summaryText, last_message_at: new Date().toISOString() }
+            : c
+        )
+      );
 
     } catch (err) {
       console.error('Failed to send message:', err);
     } finally {
       setSendingMsg(false);
+      setUploadingImage(false);
     }
   };
 
@@ -493,15 +595,21 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* TAB 3: INTERNAL MESSAGES INBOX */}
+        {/* TAB 3: REALTIME CHAT & PHOTO ATTACHMENTS */}
         {activeTab === 'messages' && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden grid grid-cols-1 md:grid-cols-3 min-h-[500px]">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden grid grid-cols-1 md:grid-cols-3 min-h-[580px]">
             {/* Conversation List */}
             <div className="border-r border-slate-200 bg-slate-50/50 flex flex-col">
-              <div className="p-4 border-b border-slate-200 font-black text-xs uppercase tracking-wider text-slate-500">
-                {t('messages')}
+              <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+                <span className="font-black text-xs uppercase tracking-wider text-slate-500">
+                  {t('messages')}
+                </span>
+                <span className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  {t('onlineNow')}
+                </span>
               </div>
-              <div className="overflow-y-auto flex-1 divide-y divide-slate-100">
+              <div className="overflow-y-auto flex-1 divide-y divide-slate-100 max-h-[520px]">
                 {conversations.length === 0 ? (
                   <div className="p-8 text-center text-xs text-slate-400">
                     <MessageSquare className="w-8 h-8 mx-auto mb-2 text-slate-300" />
@@ -543,19 +651,21 @@ function DashboardContent() {
               </div>
             </div>
 
-            {/* Chat Content Panel */}
-            <div className="md:col-span-2 flex flex-col justify-between bg-white h-[500px]">
+            {/* Live Chat Panel */}
+            <div className="md:col-span-2 flex flex-col justify-between bg-white h-[580px]">
               {selectedConv ? (
                 <>
-                  {/* Top Bar for Active Chat */}
+                  {/* Top Bar */}
                   <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                    <div>
-                      <h4 className="text-xs font-black text-slate-900">
-                        {selectedConv.listings?.year} {selectedConv.listings?.make} {selectedConv.listings?.model}
-                      </h4>
-                      <span className="text-[11px] font-bold text-[#e03a14]">
-                        {formatPrice(selectedConv.listings?.price || 0)}
-                      </span>
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <h4 className="text-xs font-black text-slate-900">
+                          {selectedConv.listings?.year} {selectedConv.listings?.make} {selectedConv.listings?.model}
+                        </h4>
+                        <span className="text-[11px] font-bold text-[#e03a14]">
+                          {formatPrice(selectedConv.listings?.price || 0)}
+                        </span>
+                      </div>
                     </div>
                     {selectedConv.listings?.id && (
                       <Link
@@ -563,7 +673,7 @@ function DashboardContent() {
                         className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1 font-semibold"
                       >
                         <ExternalLink className="w-3 h-3" />
-                        {isAr ? 'عرض السيارة' : 'View Listing'}
+                        {isAr ? 'عرض الإعلان' : 'View Listing'}
                       </Link>
                     )}
                   </div>
@@ -578,37 +688,97 @@ function DashboardContent() {
                           className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
                         >
                           <div
-                            className={`max-w-[75%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed ${
+                            className={`max-w-[75%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed space-y-2 ${
                               isMe
                                 ? 'bg-[#e03a14] text-white rounded-br-xs'
                                 : 'bg-slate-100 text-slate-800 rounded-bl-xs'
                             }`}
                           >
-                            <p>{m.content}</p>
-                            <span className={`text-[9px] mt-1 block opacity-70 ${isMe ? 'text-right' : 'text-left'}`}>
+                            {/* Attached Image if exists */}
+                            {m.image_url && (
+                              <div className="rounded-xl overflow-hidden max-w-xs border border-white/20 bg-black/10">
+                                <a href={m.image_url} target="_blank" rel="noopener noreferrer">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={m.image_url}
+                                    alt="attachment"
+                                    className="w-full h-auto object-cover max-h-56 hover:opacity-90 transition cursor-zoom-in"
+                                  />
+                                </a>
+                              </div>
+                            )}
+
+                            {m.content && (!m.image_url || m.content !== (isAr ? '📷 صورة مرفقة' : '📷 Photo attachment')) && (
+                              <p className="whitespace-pre-line">{m.content}</p>
+                            )}
+
+                            <span className={`text-[9px] block opacity-70 ${isMe ? 'text-right' : 'text-left'}`}>
                               {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
                         </div>
                       );
                     })}
+                    <div ref={messagesEndRef} />
                   </div>
 
-                  {/* Send Form */}
-                  <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-100 flex gap-2">
+                  {/* Attached Image Preview Bar */}
+                  {filePreview && (
+                    <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 flex items-center gap-3">
+                      <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-slate-300">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={filePreview} alt="preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={removeSelectedFile}
+                          className="absolute top-0 right-0 bg-black/70 text-white rounded-full p-0.5 hover:bg-red-600 transition"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <span className="text-[11px] text-slate-500 font-medium">
+                        {selectedFile?.name} (Ready to send)
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Send Form with File Attachment */}
+                  <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-100 flex items-center gap-2">
+                    {/* File Attachment Button */}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/*"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-2.5 rounded-xl border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition"
+                      title={t('attachImage')}
+                    >
+                      <Paperclip className="w-4 h-4" />
+                    </button>
+
                     <input
                       type="text"
-                      placeholder={t('typeMessage')}
+                      placeholder={uploadingImage ? t('uploadingImage') : t('typeMessage')}
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
                       className="flex-1 px-4 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14]"
                     />
+
                     <button
                       type="submit"
-                      disabled={sendingMsg || !newMessage.trim()}
-                      className="bg-[#e03a14] hover:bg-[#c53210] disabled:bg-slate-300 text-white p-2.5 rounded-xl transition"
+                      disabled={sendingMsg || (!newMessage.trim() && !selectedFile)}
+                      className="bg-[#e03a14] hover:bg-[#c53210] disabled:bg-slate-300 text-white p-2.5 rounded-xl transition flex items-center justify-center shadow-2xs"
                     >
-                      <Send className="w-4 h-4" />
+                      {sendingMsg ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
                     </button>
                   </form>
                 </>
@@ -756,7 +926,7 @@ function DashboardContent() {
                 </button>
               )}
 
-              {/* Danger Zone: Delete Account */}
+              {/* Delete Account */}
               <div className="pt-6 border-t border-red-100">
                 <h4 className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">
                   {t('deleteAccount')}
