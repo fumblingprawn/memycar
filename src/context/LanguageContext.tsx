@@ -2,14 +2,15 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Locale, t as translateHelper, formatPrice, formatMileage } from '@/lib/i18n';
+import { Locale, t as translateHelper, formatPrice as priceHelper, formatMileage as mileageHelper } from '@/lib/i18n';
 
 interface LanguageContextType {
   locale: Locale;
   dir: 'ltr' | 'rtl';
   isAr: boolean;
   toggleLanguage: () => void;
-  t: (key: string) => string;
+  setLocaleDirect: (lang: Locale) => void;
+  t: (path: string) => string;
   formatPrice: (amount: number | string) => string;
   formatMileage: (km: number | string) => string;
 }
@@ -19,6 +20,7 @@ const LanguageContext = createContext<LanguageContextType>({
   dir: 'ltr',
   isAr: false,
   toggleLanguage: () => {},
+  setLocaleDirect: () => {},
   t: (k) => k,
   formatPrice: (a) => `AED ${a}`,
   formatMileage: (m) => `${m} km`,
@@ -34,20 +36,29 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       setLocale(saved);
       document.documentElement.lang = saved;
       document.documentElement.dir = saved === 'ar' ? 'rtl' : 'ltr';
+      document.cookie = `NEXT_LOCALE=${saved}; path=/; max-age=31536000`;
     }
   }, []);
 
-  const toggleLanguage = useCallback(() => {
-    const next: Locale = locale === 'en' ? 'ar' : 'en';
+  const applyLocale = useCallback((next: Locale) => {
     setLocale(next);
     localStorage.setItem('memycar_lang', next);
+    document.cookie = `NEXT_LOCALE=${next}; path=/; max-age=31536000`;
     document.documentElement.lang = next;
     document.documentElement.dir = next === 'ar' ? 'rtl' : 'ltr';
-    
-    // Broadcast for immediate child sync
+
     window.dispatchEvent(new CustomEvent('memycar_locale_change', { detail: next }));
     router.refresh();
-  }, [locale, router]);
+  }, [router]);
+
+  const toggleLanguage = useCallback(() => {
+    const next: Locale = locale === 'en' ? 'ar' : 'en';
+    applyLocale(next);
+  }, [locale, applyLocale]);
+
+  const setLocaleDirect = useCallback((next: Locale) => {
+    applyLocale(next);
+  }, [applyLocale]);
 
   return (
     <LanguageContext.Provider
@@ -56,9 +67,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         dir: locale === 'ar' ? 'rtl' : 'ltr',
         isAr: locale === 'ar',
         toggleLanguage,
-        t: (key: string) => translateHelper(key, locale),
-        formatPrice: (amt) => formatPrice(amt, locale),
-        formatMileage: (km) => formatMileage(km, locale),
+        setLocaleDirect,
+        t: (path: string) => translateHelper(path, locale),
+        formatPrice: (amt) => priceHelper(amt, locale),
+        formatMileage: (km) => mileageHelper(km, locale),
       }}
     >
       {children}
