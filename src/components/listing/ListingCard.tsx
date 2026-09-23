@@ -1,13 +1,18 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Listing } from '@/types/listing';
 import { useLanguage } from '@/context/LanguageContext';
-import { Phone, MessageSquare, Gauge, Eye, Clock } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { Phone, MessageSquare, Gauge, Eye, Clock, Loader2 } from 'lucide-react';
 
 export default function ListingCard({ listing }: { listing: Listing }) {
+  const router = useRouter();
+  const supabase = createClient();
   const { t, formatPrice, formatMileage, isAr } = useLanguage();
+  const [chatStarting, setChatStarting] = useState(false);
 
   const price = (listing as any).price ?? (listing as any).price_aed ?? 0;
   const mileage = (listing as any).mileage ?? (listing as any).mileage_km ?? 0;
@@ -25,7 +30,6 @@ export default function ListingCard({ listing }: { listing: Listing }) {
     coverImage = (listing as any).images[0];
   }
 
-  // Format relative upload date
   const formatTimeAgo = (dateStr?: string) => {
     if (!dateStr) return isAr ? 'حديثاً' : 'Recent';
     const diffSec = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
@@ -36,6 +40,73 @@ export default function ListingCard({ listing }: { listing: Listing }) {
     }
     const days = Math.floor(diffSec / 86400);
     return isAr ? `منذ ${days} ي` : `${days}d ago`;
+  };
+
+  const handleMessageSeller = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      router.push('/auth');
+      return;
+    }
+
+    const sellerId = (listing as any).user_id;
+    if (sellerId && sellerId === user.id) {
+      alert(t('cantMessageOwnListing'));
+      return;
+    }
+
+    setChatStarting(true);
+    try {
+      if (!sellerId) {
+        // If listing has no user_id, route to car page
+        router.push(`/listing/${listing.id}`);
+        return;
+      }
+
+      // 1. Look for existing conversation
+      const { data: existing } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('listing_id', listing.id)
+        .eq('buyer_id', user.id)
+        .maybeSingle();
+
+      let conversationId = existing?.id;
+
+      // 2. Create conversation if it doesn't exist
+      if (!conversationId) {
+        const greeting = isAr ? 'مرحبا، هل هذه السيارة ما زالت متوفرة؟' : 'Hi, is this vehicle still available?';
+        const { data: created, error: createErr } = await supabase
+          .from('conversations')
+          .insert({
+            listing_id: listing.id,
+            buyer_id: user.id,
+            seller_id: sellerId,
+            last_message: greeting,
+          })
+          .select()
+          .single();
+
+        if (createErr) throw createErr;
+        conversationId = created.id;
+
+        await supabase.from('messages').insert({
+          conversation_id: conversationId,
+          sender_id: user.id,
+          content: greeting,
+        });
+      }
+
+      router.push(`/dashboard?tab=messages&conv=${conversationId}`);
+    } catch (err: any) {
+      console.error('Failed to open chat:', err);
+      router.push(`/listing/${listing.id}`);
+    } finally {
+      setChatStarting(false);
+    }
   };
 
   return (
@@ -56,7 +127,7 @@ export default function ListingCard({ listing }: { listing: Listing }) {
             {listing.year}
           </span>
 
-          {/* View Count & Upload Date Overlay Pill */}
+          {/* View Count & Upload Date Badge */}
           <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/65 backdrop-blur-md text-white text-[10px] font-semibold px-2 py-0.5 rounded-md">
             <span className="flex items-center gap-0.5">
               <Eye className="w-3 h-3 text-slate-300" />
@@ -107,17 +178,22 @@ export default function ListingCard({ listing }: { listing: Listing }) {
       <div className="p-4 pt-0 grid grid-cols-2 gap-2 mt-2">
         <button
           type="button"
-          disabled
-          className="bg-slate-100 text-slate-400 py-2 px-2 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1"
+          disabled={chatStarting}
+          onClick={handleMessageSeller}
+          className="bg-slate-900 hover:bg-black text-white py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs transition"
         >
-          <MessageSquare className="w-3 h-3" />
-          {isAr ? 'محادثة (قريباً)' : 'Chat (Soon)'}
+          {chatStarting ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : (
+            <MessageSquare className="w-3 h-3 text-[#e03a14]" />
+          )}
+          {t('messageSeller')}
         </button>
 
         {phone ? (
           <a
             href={`tel:${phone}`}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 shadow-xs transition"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs transition"
           >
             <Phone className="w-3 h-3" />
             {isAr ? 'اتصال بالبائع' : 'Call Seller'}
