@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
-import { Lock, Mail, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Lock, Mail, Loader2, AlertCircle, ArrowLeft, User, Phone } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AuthPage() {
@@ -13,6 +13,8 @@ export default function AuthPage() {
   const { t, isAr } = useLanguage();
 
   const [isSignUp, setIsSignUp] = useState(false);
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,11 +29,41 @@ export default function AuthPage() {
 
     try {
       if (isSignUp) {
+        // Validate UAE Phone Number before creating account
+        const cleanPhone = phone.replace(/[\s-]/g, '');
+        const uaePhoneRegex = /^(?:\+971|00971|0)?5[024568]\d{7}$/;
+
+        if (!uaePhoneRegex.test(cleanPhone)) {
+          setErrorMsg(
+            isAr
+              ? 'يرجى إدخال رقم هاتف إماراتي متحرك صحيح (مثال: 0501234567 أو +971501234567)'
+              : 'Please enter a valid UAE mobile number (e.g., +971 50 123 4567 or 050 123 4567)'
+          );
+          setLoading(false);
+          return;
+        }
+
+        let formattedPhone = cleanPhone;
+        if (formattedPhone.startsWith('05')) {
+          formattedPhone = '+971' + formattedPhone.slice(1);
+        } else if (!formattedPhone.startsWith('+')) {
+          formattedPhone = '+' + formattedPhone;
+        }
+
+        // Register user with metadata locked in from day 1
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            data: {
+              full_name: fullName.trim(),
+              phone: formattedPhone,
+            },
+          },
         });
+
         if (error) throw error;
+
         if (data?.user?.identities?.length === 0) {
           setErrorMsg(isAr ? 'هذا البريد مسجل بالفعل.' : 'Email already registered.');
         } else {
@@ -79,9 +111,13 @@ export default function AuthPage() {
             {isSignUp ? t('signup') : t('login')}
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            {isAr
-              ? 'سجل دخولك لإدارة سياراتك ومتابعة الإعلانات المحفوظة'
-              : 'Sign in to manage your cars and view saved listings'}
+            {isSignUp
+              ? (isAr
+                  ? 'أنشئ حسابك لبدء بيع سياراتك وإدارتها عبر ميميكار'
+                  : 'Create an account to start listing and managing vehicles on memycar')
+              : (isAr
+                  ? 'سجل دخولك لمتابعة إعلاناتك والسيارات المحفوظة'
+                  : 'Sign in to manage your cars and view saved listings')}
           </p>
         </div>
 
@@ -99,6 +135,50 @@ export default function AuthPage() {
         )}
 
         <form onSubmit={handleAuth} className="space-y-4">
+          {/* Sign Up Exclusive Fields: Name & Phone */}
+          {isSignUp && (
+            <>
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  {isAr ? 'اسم البائع / المعرض *' : 'Seller / Display Name *'}
+                </label>
+                <div className="relative">
+                  <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    required
+                    type="text"
+                    placeholder="e.g. DXB01 / Apex Motors"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full pl-10 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  {isAr ? 'رقم الهاتف / الواتساب في الإمارات *' : 'UAE Phone / WhatsApp *'}
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    required
+                    type="tel"
+                    dir="ltr"
+                    placeholder="+971 50 123 4567 or 0501234567"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full pl-10 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14]"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  {isAr ? 'أرقام الهواتف المعتمدة: 050، 052، 054، 055، 056، 058' : 'Valid UAE carriers: 050, 052, 054, 055, 056, 058'}
+                </span>
+              </div>
+            </>
+          )}
+
+          {/* Standard Fields: Email & Password */}
           <div>
             <label className="text-xs font-semibold text-slate-700 block mb-1">
               {t('email')}
