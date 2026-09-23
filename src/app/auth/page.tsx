@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
-import { Car, Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
+import { Lock, Mail, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 
 export default function AuthPage() {
   const router = useRouter();
@@ -36,10 +37,13 @@ export default function AuthPage() {
         } else {
           setSuccessMsg(
             isAr
-              ? 'تم إنشاء الحساب بنجاح! تم تسجيل دخولك.'
+              ? 'تم إنشاء الحساب بنجاح! جاري تحويلك...'
               : 'Account created successfully! Redirecting...'
           );
-          setTimeout(() => router.push('/dashboard'), 1200);
+          setTimeout(() => {
+            router.push('/dashboard');
+            router.refresh();
+          }, 1000);
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
@@ -58,32 +62,38 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center p-4">
+    <div className="min-h-[85vh] bg-[#f8f9fa] flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl border border-slate-200 p-8 max-w-md w-full shadow-sm">
+        {/* Back Link */}
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900 mb-6 transition"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          {isAr ? 'العودة للرئيسية' : 'Back to Home'}
+        </Link>
+
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="w-12 h-12 bg-orange-50 text-[#e03a14] rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <Car className="w-6 h-6" />
-          </div>
           <h1 className="text-2xl font-black text-slate-900">
             {isSignUp ? t('signup') : t('login')}
           </h1>
           <p className="text-xs text-slate-500 mt-1">
             {isAr
-              ? 'أدر سياراتك المعروضة وتصفح قوائمك المفضلة'
-              : 'Manage your listings and view saved vehicles'}
+              ? 'سجل دخولك لإدارة سياراتك ومتابعة الإعلانات المحفوظة'
+              : 'Sign in to manage your cars and view saved listings'}
           </p>
         </div>
 
         {errorMsg && (
-          <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2 mb-4">
+          <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2 mb-4 font-medium">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
             <span>{errorMsg}</span>
           </div>
         )}
 
         {successMsg && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl mb-4 text-center font-semibold">
+          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl mb-4 text-center font-bold">
             {successMsg}
           </div>
         )}
@@ -94,14 +104,14 @@ export default function AuthPage() {
               {t('email')}
             </label>
             <div className="relative">
-              <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 required
                 type="email"
                 placeholder="name@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14]"
+                className="w-full pl-10 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14]"
               />
             </div>
           </div>
@@ -111,14 +121,14 @@ export default function AuthPage() {
               {t('password')}
             </label>
             <div className="relative">
-              <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 required
                 type="password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14]"
+                className="w-full pl-10 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14]"
               />
             </div>
           </div>

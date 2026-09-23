@@ -9,7 +9,7 @@ import ListingCard from '@/components/listing/ListingCard';
 import { 
   Car, 
   Bookmark, 
-  User, 
+  User as UserIcon, 
   LogOut, 
   PlusCircle, 
   Trash2, 
@@ -39,7 +39,7 @@ export default function DashboardPage() {
 
     setUser(user);
 
-    // 1. Fetch listings created by user
+    // 1. Fetch user's listings
     const { data: listings } = await supabase
       .from('listings')
       .select('*')
@@ -91,34 +91,34 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center">
+      <div className="min-h-[70vh] bg-[#f8f9fa] flex items-center justify-center">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#e03a14] border-t-transparent"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] py-8">
+    <div className="min-h-[85vh] bg-[#f8f9fa] py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* User Welcome Header */}
+        {/* User Card */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-lg">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-lg">
               {user?.email?.charAt(0).toUpperCase()}
             </div>
             <div>
-              <h1 className="text-xl font-black text-slate-900">{user?.email}</h1>
+              <h1 className="text-lg font-black text-slate-900">{user?.email}</h1>
               <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                {isAr ? 'عضو موثق في ميميكار' : 'Verified memycar Seller'}
+                {isAr ? 'عضو موثق في ميميكار' : 'Verified memycar Member'}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Link
               href="/sell"
-              className="bg-[#e03a14] hover:bg-[#c53210] text-white text-xs font-bold py-2.5 px-4 rounded-xl flex items-center gap-1.5 transition shadow-sm"
+              className="flex-1 sm:flex-none justify-center bg-[#e03a14] hover:bg-[#c53210] text-white text-xs font-bold py-2.5 px-4 rounded-xl flex items-center gap-1.5 transition shadow-sm"
             >
               <PlusCircle className="w-4 h-4" />
               {t('sellCar')}
@@ -133,7 +133,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Tab Controls */}
+        {/* Tab Switcher */}
         <div className="flex gap-2 border-b border-slate-200 mb-6 pb-2">
           <button
             onClick={() => setActiveTab('listings')}
@@ -167,12 +167,12 @@ export default function DashboardPage() {
                 : 'text-slate-600 hover:bg-slate-200/60'
             }`}
           >
-            <User className="w-4 h-4" />
+            <UserIcon className="w-4 h-4" />
             {t('accountSettings')}
           </button>
         </div>
 
-        {/* TAB 1: MY VEHICLES FOR SALE */}
+        {/* Tab 1: My Cars */}
         {activeTab === 'listings' && (
           <div>
             {myListings.length === 0 ? (
@@ -241,7 +241,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* TAB 2: SAVED LISTINGS */}
+        {/* Tab 2: Saved Cars */}
         {activeTab === 'saved' && (
           <div>
             {savedListings.length === 0 ? (
@@ -265,7 +265,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* TAB 3: ACCOUNT INFO */}
+        {/* Tab 3: Account */}
         {activeTab === 'account' && (
           <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-lg shadow-sm space-y-4">
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
