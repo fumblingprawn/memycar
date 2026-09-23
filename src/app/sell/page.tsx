@@ -220,6 +220,8 @@ export default function SellPage() {
         seller_phone: sellerDisplayPhone,
         contact_name: sellerDisplayName,
         contact_phone: sellerDisplayPhone,
+        whatsapp_number: sellerDisplayPhone || "",
+        phone: sellerDisplayPhone || "",
         image_urls: uploadedImageUrls,
       };
 
