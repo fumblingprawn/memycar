@@ -6,28 +6,37 @@ import { createClient } from '@/lib/supabase/client';
 import { carData, years } from '@/lib/constants/car-data';
 import PhotoSlotUploader from '@/components/sell/PhotoSlotUploader';
 import { PhotoSlotKey } from '@/types/listing';
+import { useLanguage } from '@/context/LanguageContext';
 import { CheckCircle2, ChevronRight, Car, Camera, FileText, User } from 'lucide-react';
 
 export default function SellPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { t, isAr } = useLanguage();
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Form State: Initialized with empty strings for clean default select placeholders
   const [formData, setFormData] = useState({
     make: '',
     model: '',
-    year: '2023',
+    year: '',
     trim: '',
-    previous_owners: '1',
-    specs: 'GCC Specs',
+    previous_owners: '',
+    specs: '',
+    body_type: '',
+    horsepower: '',
+    cylinders: '',
+    accident_history: '',
+    warranty: '',
+    exterior_color: '',
     mileage: '',
     price: '',
-    city: 'Dubai',
-    transmission: 'Automatic',
-    fuel_type: 'Petrol',
+    city: '',
+    transmission: '',
+    fuel_type: '',
     description: '',
     last_service_date: '',
     service_notes: '',
@@ -46,6 +55,12 @@ export default function SellPage() {
   const [directUrls, setDirectUrls] = useState<Record<string, string>>({});
 
   const emirateOptions = ['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain'];
+  const bodyTypes = ['SUV', 'Sedan', 'Coupe', 'Convertible', 'Hatchback', 'Truck'];
+  const horsepowerOptions = ['Under 200 HP', '200 - 300 HP', '300 - 400 HP', '400 - 500 HP', '500+ HP'];
+  const cylinderOptions = ['4 Cylinder', '6 Cylinder', '8 Cylinder', '10+ Cylinder'];
+  const accidentOptions = ['Clean (No Accidents)', 'Minor Cosmetic Paint', 'Accident Repaired'];
+  const warrantyOptions = ['Under Agency Warranty', 'No Warranty / Expired'];
+
   const availableModels = formData.make
     ? carData.makes.find((m) => m.make.toLowerCase() === formData.make.toLowerCase())?.models || []
     : [];
@@ -68,7 +83,6 @@ export default function SellPage() {
     });
 
     if (error) {
-      // Fallback: convert file to a local Data URL if bucket is not configured yet
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
@@ -88,7 +102,6 @@ export default function SellPage() {
     try {
       const uploadedUrls: string[] = [];
 
-      // 1. Process 5 standardized slots
       for (const key of Object.keys(photoSlots) as PhotoSlotKey[]) {
         const file = photoSlots[key];
         if (file) {
@@ -99,7 +112,6 @@ export default function SellPage() {
         }
       }
 
-      // 2. Process extra files
       for (const extra of extraPhotos) {
         const url = await uploadFileToSupabase(extra);
         uploadedUrls.push(url);
@@ -108,19 +120,25 @@ export default function SellPage() {
       const payload = {
         make: formData.make,
         model: formData.model,
-        year: parseInt(formData.year, 10),
+        year: parseInt(formData.year, 10) || new Date().getFullYear(),
         trim: formData.trim || null,
-        specs: formData.specs,
+        specs: formData.specs || 'GCC Specs',
+        body_type: formData.body_type || null,
+        horsepower: formData.horsepower || null,
+        cylinders: formData.cylinders || null,
+        accident_history: formData.accident_history || 'Clean (No Accidents)',
+        warranty: formData.warranty || 'No Warranty / Expired',
+        exterior_color: formData.exterior_color || null,
         mileage: parseInt(formData.mileage, 10) || 0,
         price: parseInt(formData.price, 10) || 0,
-        city: formData.city,
-        transmission: formData.transmission,
-        fuel_type: formData.fuel_type,
+        city: formData.city || 'Dubai',
+        transmission: formData.transmission || 'Automatic',
+        fuel_type: formData.fuel_type || 'Petrol',
         previous_owners: parseInt(formData.previous_owners, 10) || 1,
         description: formData.description,
         last_service_date: formData.last_service_date || null,
         service_notes: formData.service_notes || null,
-        seller_name: formData.seller_name || 'Vehicle Owner',
+        seller_name: formData.seller_name || (isAr ? 'مالك السيارة' : 'Vehicle Owner'),
         seller_phone: formData.seller_phone || null,
         image_urls: uploadedUrls,
       };
@@ -141,21 +159,27 @@ export default function SellPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f4f4] py-10">
+    <div className="min-h-screen bg-[#f4f4f4] py-8">
       <div className="max-w-3xl mx-auto px-4">
-        {/* Title */}
+        {/* Header */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-6">
-          <h1 className="text-2xl font-black text-slate-900">List Your Vehicle</h1>
+          <h1 className="text-2xl font-black text-slate-900">
+            {isAr ? 'بيع سيارتك في الإمارات' : 'List Your Vehicle'}
+          </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Publish verified UAE specs directly to buyers across all Emirates.
+            {isAr ? 'انشر مواصفات سيارتك مباشرة للمشترين في كافة الإمارات.' : 'Publish verified UAE specs directly to buyers across all Emirates.'}
           </p>
         </div>
 
         {success ? (
           <div className="bg-white rounded-2xl border border-emerald-200 p-8 shadow-sm text-center">
             <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-            <h2 className="text-xl font-bold text-slate-900 mb-1">Vehicle Listed Successfully!</h2>
-            <p className="text-xs text-slate-500">Redirecting to your vehicle page...</p>
+            <h2 className="text-xl font-bold text-slate-900 mb-1">
+              {isAr ? 'تم نشر الإعلان بنجاح!' : 'Vehicle Listed Successfully!'}
+            </h2>
+            <p className="text-xs text-slate-500">
+              {isAr ? 'جاري تحويلك إلى صفحة السيارة...' : 'Redirecting to your vehicle page...'}
+            </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -169,27 +193,31 @@ export default function SellPage() {
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <Car className="w-4 h-4 text-[#e03a14]" />
-                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Step 1: Vehicle Information</h2>
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                  {isAr ? 'الخطوة ١: معلومات ومواصفات السيارة' : 'Step 1: Vehicle Information'}
+                </h2>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Make */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Make *</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('make')} *</label>
                   <select
                     required
                     value={formData.make}
                     onChange={(e) => setFormData({ ...formData, make: e.target.value, model: '' })}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
                   >
-                    <option value="">Select Make</option>
+                    <option value="">{t('selectMake')}</option>
                     {carData.makes.map((item) => (
-                      <option key={item.make} value={item.make}>{item.make}</option>
+                      <option key={item.make} value={item.make}>{t(item.make)}</option>
                     ))}
                   </select>
                 </div>
 
+                {/* Model */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Model *</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('model')} *</label>
                   <select
                     required
                     disabled={!formData.make}
@@ -197,67 +225,169 @@ export default function SellPage() {
                     onChange={(e) => setFormData({ ...formData, model: e.target.value })}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white disabled:bg-slate-100"
                   >
-                    <option value="">{formData.make ? 'Select Model' : 'Select Make First'}</option>
+                    <option value="">{formData.make ? t('selectModel') : (isAr ? 'اختر الماركة أولاً' : 'Select Make First')}</option>
                     {availableModels.map((mod) => (
                       <option key={mod} value={mod}>{mod}</option>
                     ))}
                   </select>
                 </div>
 
+                {/* Year */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Year *</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('year')} *</label>
                   <select
+                    required
                     value={formData.year}
                     onChange={(e) => setFormData({ ...formData, year: e.target.value })}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
                   >
+                    <option value="">{t('selectYear')}</option>
                     {years.map((y) => (
                       <option key={y} value={y.toString()}>{y}</option>
                     ))}
                   </select>
                 </div>
 
+                {/* Trim */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Trim / Edition</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    {isAr ? 'الفئة / الإصدار' : 'Trim / Edition'}
+                  </label>
                   <input
                     type="text"
-                    placeholder="e.g. AMG Line, Turbo, GT"
+                    placeholder="e.g. Carrera S, AMG, GTS, Turbo"
                     value={formData.trim}
                     onChange={(e) => setFormData({ ...formData, trim: e.target.value })}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
                   />
                 </div>
 
+                {/* Regional Specs */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Previous Owners *</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('specs')} *</label>
                   <select
-                    value={formData.previous_owners}
-                    onChange={(e) => setFormData({ ...formData, previous_owners: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
-                  >
-                    <option value="1">1 (Single Owner)</option>
-                    <option value="2">2 Owners</option>
-                    <option value="3">3 Owners</option>
-                    <option value="4">4+ Owners</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Regional Specs *</label>
-                  <select
+                    required
                     value={formData.specs}
                     onChange={(e) => setFormData({ ...formData, specs: e.target.value })}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
                   >
-                    <option value="GCC Specs">GCC Specs</option>
-                    <option value="Non-GCC / American">American Specs</option>
-                    <option value="Non-GCC / Japanese">Japanese Specs</option>
-                    <option value="Non-GCC / European">European Specs</option>
+                    <option value="">{t('selectSpecs')}</option>
+                    <option value="GCC Specs">{t('GCC Specs')}</option>
+                    <option value="Non-GCC / American">{t('Non-GCC / American')}</option>
+                    <option value="Non-GCC / Japanese">{t('Non-GCC / Japanese')}</option>
+                    <option value="Non-GCC / European">{t('Non-GCC / European')}</option>
                   </select>
                 </div>
 
+                {/* Accident History (Dubizzle Spec) */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Mileage (km) *</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('accidentHistory')} *</label>
+                  <select
+                    required
+                    value={formData.accident_history}
+                    onChange={(e) => setFormData({ ...formData, accident_history: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                  >
+                    <option value="">{t('selectAccident')}</option>
+                    {accidentOptions.map((opt) => (
+                      <option key={opt} value={opt}>{t(opt)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Warranty Status (Dubizzle Spec) */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('warranty')} *</label>
+                  <select
+                    required
+                    value={formData.warranty}
+                    onChange={(e) => setFormData({ ...formData, warranty: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                  >
+                    <option value="">{t('selectWarranty')}</option>
+                    {warrantyOptions.map((opt) => (
+                      <option key={opt} value={opt}>{t(opt)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Body Type */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('bodyType')}</label>
+                  <select
+                    value={formData.body_type}
+                    onChange={(e) => setFormData({ ...formData, body_type: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                  >
+                    <option value="">{t('selectBodyType')}</option>
+                    {bodyTypes.map((opt) => (
+                      <option key={opt} value={opt}>{t(opt)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Horsepower */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('horsepower')}</label>
+                  <select
+                    value={formData.horsepower}
+                    onChange={(e) => setFormData({ ...formData, horsepower: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                  >
+                    <option value="">{t('selectHorsepower')}</option>
+                    {horsepowerOptions.map((opt) => (
+                      <option key={opt} value={opt}>{t(opt)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Cylinders */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('cylinders')}</label>
+                  <select
+                    value={formData.cylinders}
+                    onChange={(e) => setFormData({ ...formData, cylinders: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                  >
+                    <option value="">{t('selectCylinders')}</option>
+                    {cylinderOptions.map((opt) => (
+                      <option key={opt} value={opt}>{t(opt)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Previous Owners */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('previousOwners')} *</label>
+                  <select
+                    required
+                    value={formData.previous_owners}
+                    onChange={(e) => setFormData({ ...formData, previous_owners: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                  >
+                    <option value="">{t('selectOwners')}</option>
+                    <option value="1">{isAr ? '١ (مالك أول)' : '1 (Single Owner)'}</option>
+                    <option value="2">{isAr ? '٢ مالكين' : '2 Owners'}</option>
+                    <option value="3">{isAr ? '٣ مالكين' : '3 Owners'}</option>
+                    <option value="4">{isAr ? '٤+ مالكين' : '4+ Owners'}</option>
+                  </select>
+                </div>
+
+                {/* Exterior Color */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('exteriorColor')}</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Black, Chalk White, Nardo Grey"
+                    value={formData.exterior_color}
+                    onChange={(e) => setFormData({ ...formData, exterior_color: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                  />
+                </div>
+
+                {/* Mileage */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('mileage')} (km) *</label>
                   <input
                     required
                     type="number"
@@ -268,8 +398,9 @@ export default function SellPage() {
                   />
                 </div>
 
+                {/* Price */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Price (AED) *</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('price')} (AED) *</label>
                   <input
                     required
                     type="number"
@@ -280,37 +411,44 @@ export default function SellPage() {
                   />
                 </div>
 
+                {/* Emirate */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Location / Emirate *</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('emirate')} *</label>
                   <select
+                    required
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
                   >
+                    <option value="">{t('selectEmirate')}</option>
                     {emirateOptions.map((em) => (
-                      <option key={em} value={em}>{em}</option>
+                      <option key={em} value={em}>{t(em)}</option>
                     ))}
                   </select>
                 </div>
 
+                {/* Transmission */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Transmission</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('transmission')} *</label>
                   <select
+                    required
                     value={formData.transmission}
                     onChange={(e) => setFormData({ ...formData, transmission: e.target.value })}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
                   >
-                    <option value="Automatic">Automatic</option>
-                    <option value="Manual">Manual</option>
+                    <option value="">{t('selectTransmission')}</option>
+                    <option value="Automatic">{t('Automatic')}</option>
+                    <option value="Manual">{t('Manual')}</option>
                   </select>
                 </div>
               </div>
 
+              {/* Description */}
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Vehicle Description</label>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">{t('vehicleDescription')}</label>
                 <textarea
                   rows={4}
-                  placeholder="Detail options, condition, and warranties..."
+                  placeholder={isAr ? 'اذكر تفاصيل إضافية مثل الضمان، الصيانة، وحالة الإطارات...' : 'Detail options, condition, and warranties...'}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
@@ -318,11 +456,13 @@ export default function SellPage() {
               </div>
             </div>
 
-            {/* STEP 2: PHOTOS (Standardized 5 Angles + Wireframe Guide) */}
+            {/* STEP 2: PHOTOS */}
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <Camera className="w-4 h-4 text-[#e03a14]" />
-                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Step 2: Vehicle Photos</h2>
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                  {isAr ? 'الخطوة ٢: صور السيارة' : 'Step 2: Vehicle Photos'}
+                </h2>
               </div>
               <PhotoSlotUploader onChange={handlePhotosChange} />
             </div>
@@ -331,12 +471,16 @@ export default function SellPage() {
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <FileText className="w-4 h-4 text-[#e03a14]" />
-                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Step 3: Service History</h2>
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                  {isAr ? 'الخطوة ٣: سجل الصيانة' : 'Step 3: Service History'}
+                </h2>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Last Service Date</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    {isAr ? 'تاريخ آخر صيانة' : 'Last Service Date'}
+                  </label>
                   <input
                     type="date"
                     value={formData.last_service_date}
@@ -345,10 +489,12 @@ export default function SellPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Maintenance Notes</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    {t('maintenanceNotes')}
+                  </label>
                   <input
                     type="text"
-                    placeholder="e.g. Major service at agency, new brakes"
+                    placeholder="e.g. Major agency service, fresh Michelin tires"
                     value={formData.service_notes}
                     onChange={(e) => setFormData({ ...formData, service_notes: e.target.value })}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
@@ -361,23 +507,29 @@ export default function SellPage() {
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <User className="w-4 h-4 text-[#e03a14]" />
-                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Step 4: Seller Details</h2>
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                  {isAr ? 'الخطوة ٤: معلومات البائع' : 'Step 4: Seller Details'}
+                </h2>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Seller Name *</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    {isAr ? 'اسم البائع / المعرض *' : 'Seller Name *'}
+                  </label>
                   <input
                     required
                     type="text"
-                    placeholder="Your Name or Dealership"
+                    placeholder="e.g. Private Owner / Al Futtaim Motors"
                     value={formData.seller_name}
                     onChange={(e) => setFormData({ ...formData, seller_name: e.target.value })}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Contact Phone / WhatsApp *</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    {isAr ? 'رقم الهاتف / الواتساب *' : 'Contact Phone / WhatsApp *'}
+                  </label>
                   <input
                     required
                     type="tel"
@@ -395,7 +547,7 @@ export default function SellPage() {
               disabled={loading}
               className="w-full bg-[#e03a14] hover:bg-[#c53210] disabled:bg-slate-400 text-white font-bold py-3.5 px-6 rounded-xl transition text-sm flex items-center justify-center gap-2 shadow-sm"
             >
-              {loading ? 'Processing & Publishing...' : 'Publish Listing'}
+              {loading ? (isAr ? 'جاري التحقق ونشر الإعلان...' : 'Processing & Publishing...') : (isAr ? 'نشر الإعلان الآن' : 'Publish Listing')}
               <ChevronRight className="w-4 h-4" />
             </button>
           </form>
