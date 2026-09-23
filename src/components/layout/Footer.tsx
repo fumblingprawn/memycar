@@ -1,95 +1,57 @@
 'use client';
 
+import React from 'react';
 import Link from 'next/link';
 import { useLanguage } from '@/context/LanguageContext';
 
 export default function Footer() {
-  const { locale } = useLanguage();
+  const { t, isAr } = useLanguage();
 
   return (
-    <footer className="bg-slate-50 border-t border-slate-100">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {/* About Section */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-slate-900">About memycar</h3>
-            <p className="text-sm text-slate-600">
-              memycar is the UAE's trusted car marketplace, connecting buyers and sellers with verified listings, transparent pricing, and standardized vehicle presentations.
+    <footer className="bg-white border-t border-slate-200 mt-16 pt-12 pb-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8 text-xs">
+          {/* About */}
+          <div>
+            <h3 className="font-bold text-slate-900 mb-3">{t('aboutTitle')}</h3>
+            <p className="text-slate-500 leading-relaxed">
+              {t('aboutText')}
             </p>
           </div>
 
           {/* Quick Links */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-slate-900">Quick Links</h3>
-            <div className="space-y-2">
-              <Link href="/" className="text-sm text-slate-600 hover:text-slate-800">
-                Home
-              </Link>
-              <Link href="/sell" className="text-sm text-slate-600 hover:text-slate-800">
-                Sell Your Car
-              </Link>
-              <Link href="/search" className="text-sm text-slate-600 hover:text-slate-800">
-                Search Cars
-              </Link>
-            </div>
+          <div>
+            <h3 className="font-bold text-slate-900 mb-3">{t('quickLinks')}</h3>
+            <ul className="space-y-2 text-slate-600">
+              <li><Link href="/" className="hover:text-[#e03a14]">{t('home')}</Link></li>
+              <li><Link href="/sell" className="hover:text-[#e03a14]">{t('sellCar')}</Link></li>
+              <li><Link href="/search" className="hover:text-[#e03a14]">{t('searchCars')}</Link></li>
+            </ul>
           </div>
 
           {/* Resources */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-slate-900">Resources</h3>
-            <div className="space-y-2">
-              <Link href="#" className="text-sm text-slate-600 hover:text-slate-800">
-                Help Center
-              </Link>
-              <Link href="#" className="text-sm text-slate-600 hover:text-slate-800">
-                Safety Tips
-              </Link>
-              <Link href="#" className="text-sm text-slate-600 hover:text-slate-800">
-                Terms of Service
-              </Link>
-              <Link href="#" className="text-sm text-slate-600 hover:text-slate-800">
-                Privacy Policy
-              </Link>
-            </div>
+          <div>
+            <h3 className="font-bold text-slate-900 mb-3">{t('resources')}</h3>
+            <ul className="space-y-2 text-slate-600">
+              <li><span className="hover:text-[#e03a14] cursor-pointer">{t('helpCenter')}</span></li>
+              <li><span className="hover:text-[#e03a14] cursor-pointer">{t('safetyTips')}</span></li>
+              <li><span className="hover:text-[#e03a14] cursor-pointer">{t('termsOfUse')}</span></li>
+              <li><span className="hover:text-[#e03a14] cursor-pointer">{t('privacyPolicy')}</span></li>
+            </ul>
           </div>
 
-          {/* Contact & Social */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-slate-900">Contact</h3>
-            <div className="space-y-2">
-              <p className="text-sm text-slate-600">
-                📧 info@memycar.com
-              </p>
-              <p className="text-sm text-slate-600">
-                📞 +971 4 123 4567
-              </p>
-              <p className="text-sm text-slate-600">
-                📍 Dubai, United Arab Emirates
-              </p>
-            </div>
-
-            <div className="mt-4 flex gap-3">
-              <a href="#" className="text-slate-500 hover:text-slate-700 transition">
-                🐦 Twitter
-              </a>
-              <a href="#" className="text-slate-500 hover:text-slate-700 transition">
-                📘 Facebook
-              </a>
-              <a href="#" className="text-slate-500 hover:text-slate-700 transition">
-                📸 Instagram
-              </a>
-              <a href="#" className="text-slate-500 hover:text-slate-700 transition">
-                💼 LinkedIn
-              </a>
-            </div>
+          {/* Contact */}
+          <div>
+            <h3 className="font-bold text-slate-900 mb-3">{t('contact')}</h3>
+            <p className="text-slate-500 mb-2">{t('dubaiUae')}</p>
+            <p className="text-slate-700 font-semibold" dir="ltr">info@memycar.com</p>
+            <p className="text-slate-700 font-semibold mt-1" dir="ltr">+971 50 123 4567</p>
           </div>
         </div>
 
-        {/* Bottom Border and Copyright */}
-        <div className="mt-8 pt-6 border-t border-slate-200">
-          <p className="text-xs text-slate-500 text-center">
-            © {new Date().getFullYear()} memycar.com. All rights reserved.
-          </p>
+        <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-2">
+          <span>© {new Date().getFullYear()} memycar.com. {t('allRightsReserved')}</span>
+          <span className="font-semibold text-slate-500">UAE Automotive Marketplace</span>
         </div>
       </div>
     </footer>

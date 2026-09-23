@@ -3,228 +3,106 @@
 import React from 'react';
 import Link from 'next/link';
 import { Listing } from '@/types/listing';
-import { MapPin, ShieldCheck, Wrench, Globe } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { Phone, MessageSquare, Gauge, ShieldCheck } from 'lucide-react';
 
-interface ListingCardProps {
-  listing: Listing;
-}
+export default function ListingCard({ listing }: { listing: Listing }) {
+  const { t, formatPrice, formatMileage, isAr } = useLanguage();
 
-export default function ListingCard({ listing }: ListingCardProps) {
-  const { locale, dir } = useLanguage();
+  const price = (listing as any).price ?? (listing as any).price_aed ?? 0;
+  const mileage = (listing as any).mileage ?? (listing as any).mileage_km ?? 0;
+  const specs = (listing as any).specs || 'GCC Specs';
+  const make = listing.make || '';
+  const model = listing.model || '';
+  const phone = (listing as any).seller_phone || (listing as any).whatsapp_number || '';
 
-  // Fallback chain for primary image
-  const primaryImage =
-    (Array.isArray((listing as any).image_urls) && (listing as any).image_urls.length > 0 && (listing as any).image_urls[0]) ||
-    (Array.isArray((listing as any).images) && (listing as any).images.length > 0 && (listing as any).images[0]) ||
-    ((listing as any).image_url) ||
-    ((listing as any).photos?.front_three_quarter) ||
-    '/placeholder-car.jpg';
-
-  // Generate a gray SVG placeholder for onError
-  const getGrayPlaceholder = () => {
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="400" height="225">
-        <rect width="400" height="225" fill="#ddd"/>
-        <text x="50%" y="50%" fill="#999" dominant-baseline="middle" text-anchor="middle">No Image</text>
-      </svg>
-    `;
-    return `data:image/svg+xml;base64,${window.btoa(svg)}`;
-  };
-
-  const isGcc = listing.specs === 'GCC';
-
-  // Price for display with proper fallback chain
-  const price = listing.price ?? listing.price_aed ?? 0;
-
-  // Service indicator text
-  let serviceIndicatorText = '';
-  if (listing.last_service_date) {
-    const date = new Date(listing.last_service_date);
-    const options: Intl.DateTimeFormatOptions = { month: 'short', year: 'numeric' };
-    serviceIndicatorText = `Serviced: ${date.toLocaleDateString(locale === 'ar' ? 'ar-US' : undefined, options)}`;
+  let coverImage = '/placeholder-car.jpg';
+  if (Array.isArray((listing as any).image_urls) && (listing as any).image_urls.length > 0) {
+    coverImage = (listing as any).image_urls[0];
+  } else if (Array.isArray((listing as any).images) && (listing as any).images.length > 0) {
+    coverImage = (listing as any).images[0];
   }
 
-  // Call button phone number
-  const callPhoneRaw = listing.seller_phone || (listing as any).whatsapp_number || '';
-  const callUrl = callPhoneRaw ? `tel:${callPhoneRaw}` : '#';
-
-  // Pre-compute boolean values to avoid TypeScript narrowing issues
-  const isFullAgency = listing.service_history === 'Full Agency';
-  const isUnderWarranty = listing.warranty === 'Under Agency Warranty';
-
-  // Get description based on UI language
-  const getDescription = () => {
-    if (locale === 'ar') {
-      return listing.description_ar || listing.description || '';
-    }
-    return listing.description_en || listing.description || '';
-  };
-
   return (
-    <Link
-      href={`/listing/${listing.id}`}
-      className="group block rounded-3xl border border-slate-100 overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white"
-      dir={dir}
-      lang={locale}
-    >
-      {/* 16:9 Standardized Hero Image Container */}
-      <div className="relative aspect-[16/9] w-full bg-slate-50 overflow-hidden">
-        {primaryImage ? (
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between group">
+      <div>
+        {/* Cover Photo */}
+        <Link href={`/listing/${listing.id}`} className="block relative aspect-[16/10] bg-slate-900 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={primaryImage}
-            alt={`${listing.year} ${listing.make} ${listing.model}`}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.src = getGrayPlaceholder();
-            }}
+            src={coverImage}
+            alt={`${make} ${model}`}
+            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
           />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
-            No cover image
-          </div>
-        )}
-
-        {/* Badges: Specs, Year, City */}
-        <div className="absolute top-3 left-3 flex flex-col gap-2">
-          {/* Specs Badge */}
-          <span
-            className={`text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-sm ${
-              isGcc
-                ? 'bg-emerald-600 text-white'
-                : 'bg-slate-900/80 text-white backdrop-blur-sm'
-            }`}
-          >
-            {isGcc ? '🇦🇪 GCC' : listing.specs}
+          <span className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded">
+            {t(specs)}
           </span>
-          {/* Year Badge */}
-          <span className="text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm bg-slate-900/20 text-slate-900 backdrop-blur-sm">
+          <span className="absolute top-2.5 right-2.5 bg-white/90 text-slate-800 text-[10px] font-extrabold px-2 py-0.5 rounded">
             {listing.year}
           </span>
-          {/* City Badge */}
-          <span className="text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm bg-slate-900/20 text-slate-900 backdrop-blur-sm">
-            {listing.emirate}
-          </span>
-        </div>
-      </div>
+        </Link>
 
-      {/* Card Body */}
-      <div className="p-6 pt-0">
-        <div className="mb-4">
-          <div className="flex justify-between items-start mb-2">
-            <div className="flex-1">
-              <h3 className="mb-1 text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                {listing.year} {listing.make} {listing.model}
-                {listing.trim ? <span className="ml-2 text-xs font-medium text-gray-500">{listing.trim}</span> : ''}
-              </h3>
-              <p className="text-sm text-gray-500 truncate">
-                {listing.body_style || ''}
-              </p>
-            </div>
-            <div className="flex items-center space-x-3">
-              <span className="text-2xl font-bold text-blue-600">
-                AED {Number(price).toLocaleString()}
-              </span>
-            </div>
+        {/* Info */}
+        <div className="p-4 space-y-2">
+          {/* Price */}
+          <div className="text-lg font-black text-[#e03a14]">
+            {formatPrice(price)}
           </div>
-        </div>
 
-        <div className="space-y-3">
-          <div className="text-sm text-gray-600 flex flex-wrap gap-4">
-            {/* Mileage */}
+          {/* Title */}
+          <Link href={`/listing/${listing.id}`}>
+            <h3 className="font-extrabold text-slate-900 text-sm hover:text-[#e03a14] transition line-clamp-1">
+              {listing.year} {isAr ? t(make) : make} {isAr ? t(model) : model}
+            </h3>
+          </Link>
+
+          {/* Specs Snippet */}
+          <div className="flex items-center gap-3 text-xs text-slate-500 pt-1">
             <div className="flex items-center gap-1">
-              <Wrench className="h-3 w-3 text-gray-400" />
-              <span>
-                {listing.mileage_km ? Number(listing.mileage_km).toLocaleString() : '0'} km
-              </span>
+              <Gauge className="w-3.5 h-3.5 text-slate-400" />
+              <span>{formatMileage(mileage)}</span>
             </div>
-
-            {/* Body Style */}
-            {listing.body_style && (
-              <>
-                <span className="w-0.5 bg-gray-300"></span>
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3 text-gray-400" />
-                  <span>{listing.body_style}</span>
-                </span>
-              </>
-            )}
+            <span>•</span>
+            <span className="truncate">{t(specs)}</span>
           </div>
 
-          <div className="text-sm text-gray-600 flex flex-wrap gap-4">
-            {/* Specs */}
-            <div className="flex items-center gap-1">
-              <Globe className="h-3 w-3 text-gray-400" />
-              <span>{listing.specs}</span>
-            </div>
-
-            {/* Service History */}
-            {isFullAgency && (
-              <>
-                <span className="w-0.5 bg-gray-300"></span>
-                <span className="flex items-center gap-1">
-                  <ShieldCheck className="h-3 w-3 text-blue-600" />
-                  <span>{listing.service_history}</span>
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-
-        {isFullAgency || isUnderWarranty && (
-          <div className="mt-4 pt-3 border-t border-slate-100">
-            <div className="flex items-center gap-3 text-sm">
-              {isFullAgency && (
-                <span className="px-3 py-1 bg-blue-50 text-blue-800 text-xs rounded">
-                  <ShieldCheck className="h-3 w-3 mr-1" /> Full Agency Service
-                </span>
-              )}
-              {isUnderWarranty && (
-                <span className="px-3 py-1 bg-green-50 text-green-800 text-xs rounded">
-                  <Wrench className="h-3 w-3 mr-1" /> Under Warranty
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {listing.description && (
-          <div className="mt-4">
-            <p className="text-sm text-gray-600 line-clamp-2">{getDescription()}</p>
-          </div>
-        )}
-      </div>
-
-      {/* Card Footer */}
-      <div className="pt-5 pb-4">
-        <div className="flex justify-between items-center">
-          {/* Call Seller Button */}
-          {callUrl && (
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (callUrl) {
-                  window.location.href = callUrl;
-                }
-              }}
-              className="flex-1 flex items-center justify-center bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-all hover:shadow-lg transform hover:-translate-y-1"
-            >
-              Call Seller
-            </button>
+          {/* Description snippet */}
+          {(listing as any).description && (
+            <p className="text-[11px] text-slate-400 line-clamp-2 pt-1">
+              {(listing as any).description}
+            </p>
           )}
-
-          {/* Internal Chat Button (Coming Soon) */}
-          <button
-            disabled
-            className="flex-1 flex items-center justify-center bg-slate-200 hover:bg-slate-300 text-gray-500 font-medium py-2 px-4 rounded-lg transition-all"
-          >
-            Internal Chat (Coming Soon)
-          </button>
         </div>
       </div>
-    </Link>
+
+      {/* Buttons */}
+      <div className="p-4 pt-0 grid grid-cols-2 gap-2 mt-2">
+        <button
+          type="button"
+          disabled
+          className="bg-slate-100 text-slate-400 py-2 px-2 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1"
+        >
+          <MessageSquare className="w-3 h-3" />
+          {isAr ? 'محادثة (قريباً)' : 'Chat (Soon)'}
+        </button>
+
+        {phone ? (
+          <a
+            href={`tel:${phone}`}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 shadow-sm transition"
+          >
+            <Phone className="w-3 h-3" />
+            {isAr ? 'اتصال بالبائع' : 'Call Seller'}
+          </a>
+        ) : (
+          <Link
+            href={`/listing/${listing.id}`}
+            className="bg-[#e03a14] hover:bg-[#c53210] text-white py-2 px-2 rounded-xl text-[11px] font-bold text-center transition"
+          >
+            {isAr ? 'عرض التفاصيل' : 'View Details'}
+          </Link>
+        )}
+      </div>
+    </div>
   );
 }
