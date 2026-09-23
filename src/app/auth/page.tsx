@@ -4,7 +4,17 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
-import { Lock, Mail, Loader2, AlertCircle, ArrowLeft, User, Phone } from 'lucide-react';
+import { 
+  Lock, 
+  Mail, 
+  Loader2, 
+  AlertCircle, 
+  ArrowLeft, 
+  User, 
+  Phone,
+  Check,
+  X
+} from 'lucide-react';
 import Link from 'next/link';
 
 export default function AuthPage() {
@@ -21,6 +31,14 @@ export default function AuthPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Strong Password Checks
+  const hasMinLength = password.length >= 8;
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasLowerCase = /[a-z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecial = /[^A-Za-z0-9]/.test(password);
+  const isPasswordStrong = hasMinLength && hasUpperCase && hasLowerCase && hasNumber && hasSpecial;
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -29,7 +47,18 @@ export default function AuthPage() {
 
     try {
       if (isSignUp) {
-        // Validate UAE Phone Number before creating account
+        // 1. Password Strength Validation
+        if (!isPasswordStrong) {
+          setErrorMsg(
+            isAr
+              ? 'كلمة المرور لا تستوفي شروط الأمان المطلوبة.'
+              : 'Please ensure your password meets all security requirements.'
+          );
+          setLoading(false);
+          return;
+        }
+
+        // 2. UAE Phone Number Format Validation
         const cleanPhone = phone.replace(/[\s-]/g, '');
         const uaePhoneRegex = /^(?:\+971|00971|0)?5[024568]\d{7}$/;
 
@@ -50,7 +79,35 @@ export default function AuthPage() {
           formattedPhone = '+' + formattedPhone;
         }
 
-        // Register user with metadata locked in from day 1
+        // 3. Client Pre-Check for Duplicate Username and Phone
+        const { data: existingUser } = await supabase
+          .from('profiles')
+          .select('username, phone')
+          .or(`username.ilike.${fullName.trim()},phone.eq.${formattedPhone}`)
+          .maybeSingle();
+
+        if (existingUser) {
+          if (existingUser.username.toLowerCase() === fullName.trim().toLowerCase()) {
+            setErrorMsg(
+              isAr
+                ? 'اسم المستخدم هذا مسجل بالفعل. يرجى اختيار اسم آخر.'
+                : 'This username is already taken. Please choose another.'
+            );
+            setLoading(false);
+            return;
+          }
+          if (existingUser.phone === formattedPhone) {
+            setErrorMsg(
+              isAr
+                ? 'رقم الهاتف هذا مسجل بحساب آخر بالفعل.'
+                : 'This phone number is already registered to another account.'
+            );
+            setLoading(false);
+            return;
+          }
+        }
+
+        // 4. Create Account via Supabase Auth
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -135,12 +192,12 @@ export default function AuthPage() {
         )}
 
         <form onSubmit={handleAuth} className="space-y-4">
-          {/* Sign Up Exclusive Fields: Name & Phone */}
           {isSignUp && (
             <>
+              {/* Username */}
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  {isAr ? 'اسم البائع / المعرض *' : 'Seller / Display Name *'}
+                  {isAr ? 'اسم المستخدم / المعرض *' : 'Username / Display Name *'}
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -155,6 +212,7 @@ export default function AuthPage() {
                 </div>
               </div>
 
+              {/* Phone */}
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-1">
                   {isAr ? 'رقم الهاتف / الواتساب في الإمارات *' : 'UAE Phone / WhatsApp *'}
@@ -178,7 +236,7 @@ export default function AuthPage() {
             </>
           )}
 
-          {/* Standard Fields: Email & Password */}
+          {/* Email */}
           <div>
             <label className="text-xs font-semibold text-slate-700 block mb-1">
               {t('email')}
@@ -196,6 +254,7 @@ export default function AuthPage() {
             </div>
           </div>
 
+          {/* Password */}
           <div>
             <label className="text-xs font-semibold text-slate-700 block mb-1">
               {t('password')}
@@ -211,12 +270,41 @@ export default function AuthPage() {
                 className="w-full pl-10 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14]"
               />
             </div>
+
+            {/* Live Strong Password Checklist (Only shown during Sign Up) */}
+            {isSignUp && password.length > 0 && (
+              <div className="mt-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1 text-[11px]">
+                <span className="font-bold text-slate-700 block mb-1">
+                  {isAr ? 'شروط كلمة المرور:' : 'Password Requirements:'}
+                </span>
+                
+                <div className={`flex items-center gap-1.5 ${hasMinLength ? 'text-emerald-600 font-semibold' : 'text-slate-400'}`}>
+                  {hasMinLength ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                  <span>{isAr ? '٨ أحرف على الأقل' : 'At least 8 characters'}</span>
+                </div>
+
+                <div className={`flex items-center gap-1.5 ${hasUpperCase && hasLowerCase ? 'text-emerald-600 font-semibold' : 'text-slate-400'}`}>
+                  {hasUpperCase && hasLowerCase ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                  <span>{isAr ? 'حرف كبير وصغير (A-z)' : 'Uppercase & lowercase letters'}</span>
+                </div>
+
+                <div className={`flex items-center gap-1.5 ${hasNumber ? 'text-emerald-600 font-semibold' : 'text-slate-400'}`}>
+                  {hasNumber ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                  <span>{isAr ? 'رقم واحد على الأقل (0-9)' : 'At least one number'}</span>
+                </div>
+
+                <div className={`flex items-center gap-1.5 ${hasSpecial ? 'text-emerald-600 font-semibold' : 'text-slate-400'}`}>
+                  {hasSpecial ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                  <span>{isAr ? 'رمز خاص (!@#$%^&*)' : 'At least one symbol (!@#$%^&*)'}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-[#e03a14] hover:bg-[#c53210] disabled:bg-slate-300 text-white font-bold py-3 rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-2"
+            disabled={loading || (isSignUp && !isPasswordStrong)}
+            className="w-full bg-[#e03a14] hover:bg-[#c53210] disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-2"
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             {isSignUp ? t('signup') : t('signInWithEmail')}
@@ -229,7 +317,10 @@ export default function AuthPage() {
               {t('alreadyHaveAccount')}{' '}
               <button
                 type="button"
-                onClick={() => setIsSignUp(false)}
+                onClick={() => {
+                  setIsSignUp(false);
+                  setErrorMsg(null);
+                }}
                 className="font-bold text-[#e03a14] hover:underline"
               >
                 {t('login')}
@@ -240,7 +331,10 @@ export default function AuthPage() {
               {t('dontHaveAccount')}{' '}
               <button
                 type="button"
-                onClick={() => setIsSignUp(true)}
+                onClick={() => {
+                  setIsSignUp(true);
+                  setErrorMsg(null);
+                }}
                 className="font-bold text-[#e03a14] hover:underline"
               >
                 {t('signup')}
