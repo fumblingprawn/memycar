@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Listing } from '@/types/listing';
 import { useLanguage } from '@/context/LanguageContext';
-import { Phone, MessageSquare, Gauge, ShieldCheck } from 'lucide-react';
+import { Phone, MessageSquare, Gauge, Eye, Clock } from 'lucide-react';
 
 export default function ListingCard({ listing }: { listing: Listing }) {
   const { t, formatPrice, formatMileage, isAr } = useLanguage();
@@ -15,6 +15,8 @@ export default function ListingCard({ listing }: { listing: Listing }) {
   const make = listing.make || '';
   const model = listing.model || '';
   const phone = (listing as any).seller_phone || (listing as any).whatsapp_number || '';
+  const viewCount = (listing as any).view_count ?? 0;
+  const createdAt = (listing as any).created_at;
 
   let coverImage = '/placeholder-car.jpg';
   if (Array.isArray((listing as any).image_urls) && (listing as any).image_urls.length > 0) {
@@ -23,8 +25,21 @@ export default function ListingCard({ listing }: { listing: Listing }) {
     coverImage = (listing as any).images[0];
   }
 
+  // Format relative upload date
+  const formatTimeAgo = (dateStr?: string) => {
+    if (!dateStr) return isAr ? 'حديثاً' : 'Recent';
+    const diffSec = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    if (diffSec < 3600) return isAr ? 'الآن' : 'Just now';
+    if (diffSec < 86400) {
+      const hours = Math.floor(diffSec / 3600);
+      return isAr ? `منذ ${hours} س` : `${hours}h ago`;
+    }
+    const days = Math.floor(diffSec / 86400);
+    return isAr ? `منذ ${days} ي` : `${days}d ago`;
+  };
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between group">
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition flex flex-col justify-between group">
       <div>
         {/* Cover Photo */}
         <Link href={`/listing/${listing.id}`} className="block relative aspect-[16/10] bg-slate-900 overflow-hidden">
@@ -40,6 +55,19 @@ export default function ListingCard({ listing }: { listing: Listing }) {
           <span className="absolute top-2.5 right-2.5 bg-white/90 text-slate-800 text-[10px] font-extrabold px-2 py-0.5 rounded">
             {listing.year}
           </span>
+
+          {/* View Count & Upload Date Overlay Pill */}
+          <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/65 backdrop-blur-md text-white text-[10px] font-semibold px-2 py-0.5 rounded-md">
+            <span className="flex items-center gap-0.5">
+              <Eye className="w-3 h-3 text-slate-300" />
+              {viewCount}
+            </span>
+            <span className="text-white/40">•</span>
+            <span className="flex items-center gap-0.5">
+              <Clock className="w-2.5 h-2.5 text-slate-300" />
+              {formatTimeAgo(createdAt)}
+            </span>
+          </div>
         </Link>
 
         {/* Info */}
@@ -57,7 +85,7 @@ export default function ListingCard({ listing }: { listing: Listing }) {
           </Link>
 
           {/* Specs Snippet */}
-          <div className="flex items-center gap-3 text-xs text-slate-500 pt-1">
+          <div className="flex items-center gap-3 text-xs text-slate-500 pt-0.5">
             <div className="flex items-center gap-1">
               <Gauge className="w-3.5 h-3.5 text-slate-400" />
               <span>{formatMileage(mileage)}</span>
@@ -68,14 +96,14 @@ export default function ListingCard({ listing }: { listing: Listing }) {
 
           {/* Description snippet */}
           {(listing as any).description && (
-            <p className="text-[11px] text-slate-400 line-clamp-2 pt-1">
+            <p className="text-[11px] text-slate-400 line-clamp-2 pt-0.5">
               {(listing as any).description}
             </p>
           )}
         </div>
       </div>
 
-      {/* Buttons */}
+      {/* Action Buttons */}
       <div className="p-4 pt-0 grid grid-cols-2 gap-2 mt-2">
         <button
           type="button"
@@ -89,7 +117,7 @@ export default function ListingCard({ listing }: { listing: Listing }) {
         {phone ? (
           <a
             href={`tel:${phone}`}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 shadow-sm transition"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 shadow-xs transition"
           >
             <Phone className="w-3 h-3" />
             {isAr ? 'اتصال بالبائع' : 'Call Seller'}

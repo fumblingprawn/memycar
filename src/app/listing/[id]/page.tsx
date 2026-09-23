@@ -20,7 +20,9 @@ import {
   Maximize2, 
   Share2, 
   Bookmark, 
-  Phone 
+  Phone,
+  Eye,
+  Clock
 } from 'lucide-react';
 
 export default function ListingDetailPage() {
@@ -44,7 +46,6 @@ export default function ListingDetailPage() {
 
   const listingId = params?.id as string;
 
-  // Check if listing is already saved by the current user
   const checkSavedStatus = useCallback(async () => {
     if (!listingId) return;
     const { data: { user } } = await supabase.auth.getUser();
@@ -57,9 +58,7 @@ export default function ListingDetailPage() {
       .eq('listing_id', listingId)
       .maybeSingle();
 
-    if (data) {
-      setSaved(true);
-    }
+    if (data) setSaved(true);
   }, [listingId, supabase]);
 
   useEffect(() => {
@@ -74,6 +73,9 @@ export default function ListingDetailPage() {
 
         if (error) throw error;
         setListing(data);
+
+        // Increment view count in Supabase
+        supabase.rpc('increment_listing_view', { target_listing_id: listingId }).then(() => {});
       } catch (err) {
         console.error('Failed to load listing:', err);
       } finally {
@@ -85,7 +87,6 @@ export default function ListingDetailPage() {
     checkSavedStatus();
   }, [listingId, supabase, checkSavedStatus]);
 
-  // Real Database Save / Unsave
   const handleToggleSave = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -106,14 +107,11 @@ export default function ListingDetailPage() {
         setSaved(true);
         await supabase
           .from('saved_listings')
-          .insert({
-            user_id: user.id,
-            listing_id: listingId,
-          });
+          .insert({ user_id: user.id, listing_id: listingId });
       }
     } catch (err) {
-      console.error('Error updating saved listing:', err);
-      setSaved(!saved); // revert on error
+      console.error('Error toggling save:', err);
+      setSaved(!saved);
     } finally {
       setSaveLoading(false);
     }
@@ -155,6 +153,18 @@ export default function ListingDetailPage() {
     }
   };
 
+  const formatFullTimeAgo = (dateStr?: string) => {
+    if (!dateStr) return isAr ? 'حديثاً' : 'Recent';
+    const diffSec = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    if (diffSec < 3600) return isAr ? 'الآن' : 'Just now';
+    if (diffSec < 86400) {
+      const hours = Math.floor(diffSec / 3600);
+      return isAr ? `منذ ${hours} ساعة` : `${hours} hours ago`;
+    }
+    const days = Math.floor(diffSec / 86400);
+    return isAr ? `منذ ${days} يوم` : `${days} days ago`;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f4f4f4] flex items-center justify-center">
@@ -192,18 +202,13 @@ export default function ListingDetailPage() {
   const serviceHistory = listing.last_service_date ? 'Documented' : 'Standard';
   const phone = listing.seller_phone || listing.whatsapp_number || '';
   const sellerName = listing.seller_name || (isAr ? 'مالك السيارة' : 'Vehicle Owner');
+  const viewCount = (listing.view_count ?? 0) + 1;
 
   const images: string[] = [];
   if (Array.isArray(listing.image_urls) && listing.image_urls.length > 0) {
     images.push(...listing.image_urls);
   } else if (Array.isArray(listing.images) && listing.images.length > 0) {
     images.push(...listing.images);
-  } else if (listing.photos && typeof listing.photos === 'object') {
-    Object.values(listing.photos).forEach((val) => {
-      if (typeof val === 'string' && val.startsWith('http')) {
-        images.push(val);
-      }
-    });
   }
 
   const activeImage = images[activeImageIndex] || null;
@@ -320,6 +325,19 @@ export default function ListingDetailPage() {
                 <p className="text-sm font-medium text-slate-500 mt-0.5">
                   {listing.trim ? `${listing.trim} • ` : ''}{listing.year}
                 </p>
+
+                {/* View Counter & Date Added Row */}
+                <div className="flex items-center gap-3 text-xs text-slate-500 pt-2 border-t border-slate-100 mt-3">
+                  <span className="flex items-center gap-1 font-bold text-slate-700">
+                    <Eye className="w-3.5 h-3.5 text-[#e03a14]" />
+                    {viewCount} {isAr ? 'مشاهدة' : 'views'}
+                  </span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    {formatFullTimeAgo(listing.created_at)}
+                  </span>
+                </div>
               </div>
 
               <div className="pt-2 border-t border-slate-100">
@@ -365,7 +383,6 @@ export default function ListingDetailPage() {
                 </button>
               )}
 
-              {/* Functional Save Button */}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <button
                   type="button"
