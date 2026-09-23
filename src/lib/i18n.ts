@@ -1,6 +1,17 @@
 export type Locale = 'en' | 'ar';
 
 export const DICTIONARY: Record<string, { en: string; ar: string }> = {
+  // Extended Dubizzle-Style Sort Options
+  "sortDefault": { en: "Default", ar: "الافتراضي" },
+  "sortNewest": { en: "Newest to Oldest", ar: "الأحدث إلى الأقدم" },
+  "sortOldest": { en: "Oldest to Newest", ar: "الأقدم إلى الأحدث" },
+  "sortPriceHighLow": { en: "Price Highest to Lowest", ar: "السعر: من الأعلى إلى الأقل" },
+  "sortPriceLowHigh": { en: "Price Lowest to Highest", ar: "السعر: من الأقل إلى الأعلى" },
+  "sortKmHighLow": { en: "Kilometers Highest to Lowest", ar: "المسافة: من الأعلى إلى الأقل" },
+  "sortKmLowHigh": { en: "Kilometers Lowest to Highest", ar: "المسافة: من الأقل إلى الأعلى" },
+  "sortYearHighLow": { en: "Year Highest to Lowest", ar: "سنة الصنع: من الأحدث إلى الأقدم" },
+  "sortYearLowHigh": { en: "Year Lowest to Highest", ar: "سنة الصنع: من الأقدم إلى الأحدث" },
+
   // Account Deletion, Views & Sorting
   "deleteAccount": { en: "Delete Account", ar: "حذف الحساب نهائياً" },
   "deleteAccountConfirm": { en: "Are you sure you want to permanently delete your account? All your vehicle listings, photos, and saved cars will be permanently wiped.", ar: "هل أنت متأكد من رغبتك في حذف حسابك نهائياً؟ سيتم حذف جميع إعلانات سياراتك وصورك وقوائمك المحفوظة فوراً." },

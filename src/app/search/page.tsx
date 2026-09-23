@@ -12,9 +12,19 @@ import {
   ArrowUpDown, 
   RotateCcw, 
   X, 
-  ChevronDown,
   Filter
 } from 'lucide-react';
+
+type SortOption = 
+  | 'default'
+  | 'newest'
+  | 'oldest'
+  | 'price_desc'
+  | 'price_asc'
+  | 'km_desc'
+  | 'km_asc'
+  | 'year_desc'
+  | 'year_asc';
 
 function SearchContent() {
   const router = useRouter();
@@ -25,9 +35,9 @@ function SearchContent() {
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'price_asc' | 'price_desc'>('newest');
+  const [sortBy, setSortBy] = useState<SortOption>('default');
 
-  // Filter state initialized from URL search params
+  // Filter state
   const [make, setMake] = useState(searchParams.get('make') || '');
   const [model, setModel] = useState(searchParams.get('model') || '');
   const [yearFrom, setYearFrom] = useState(searchParams.get('year_from') || '');
@@ -60,6 +70,7 @@ function SearchContent() {
     setMaxMileage('');
     setEmirate('');
     setSpecs('');
+    setSortBy('default');
     router.push('/search');
   };
 
@@ -77,15 +88,37 @@ function SearchContent() {
     if (emirate) query = query.ilike('city', `%${emirate}%`);
     if (specs) query = query.ilike('specs', `%${specs}%`);
 
-    // Sort order
-    if (sortBy === 'newest') {
-      query = query.order('created_at', { ascending: false });
-    } else if (sortBy === 'oldest') {
-      query = query.order('created_at', { ascending: true });
-    } else if (sortBy === 'price_asc') {
-      query = query.order('price', { ascending: true });
-    } else if (sortBy === 'price_desc') {
-      query = query.order('price', { ascending: false });
+    // Dubizzle-Style Sorting Logic
+    switch (sortBy) {
+      case 'newest':
+        query = query.order('created_at', { ascending: false });
+        break;
+      case 'oldest':
+        query = query.order('created_at', { ascending: true });
+        break;
+      case 'price_desc':
+        query = query.order('price', { ascending: false });
+        break;
+      case 'price_asc':
+        query = query.order('price', { ascending: true });
+        break;
+      case 'km_desc':
+        query = query.order('mileage', { ascending: false });
+        break;
+      case 'km_asc':
+        query = query.order('mileage', { ascending: true });
+        break;
+      case 'year_desc':
+        query = query.order('year', { ascending: false });
+        break;
+      case 'year_asc':
+        query = query.order('year', { ascending: true });
+        break;
+      case 'default':
+      default:
+        // Default: featured/newest first
+        query = query.order('created_at', { ascending: false });
+        break;
     }
 
     const { data, error } = await query;
@@ -99,7 +132,6 @@ function SearchContent() {
     fetchResults();
   }, [fetchResults]);
 
-  // Sidebar Filter Form Component
   const FilterControls = () => (
     <div className="space-y-5">
       <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -276,7 +308,7 @@ function SearchContent() {
               <span>{isAr ? 'تصفية' : 'Filters'}</span>
             </button>
 
-            {/* Sort Dropdown */}
+            {/* Dubizzle-Style Sort Dropdown */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-500 hidden sm:flex items-center gap-1 flex-shrink-0">
                 <ArrowUpDown className="w-3 h-3 text-slate-400" />
@@ -284,13 +316,18 @@ function SearchContent() {
               </span>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
                 className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14] cursor-pointer"
               >
-                <option value="newest">{t('newestFirst')}</option>
-                <option value="oldest">{t('oldestFirst')}</option>
-                <option value="price_asc">{t('priceLowHigh')}</option>
-                <option value="price_desc">{t('priceHighLow')}</option>
+                <option value="default">{t('sortDefault')}</option>
+                <option value="newest">{t('sortNewest')}</option>
+                <option value="oldest">{t('sortOldest')}</option>
+                <option value="price_desc">{t('sortPriceHighLow')}</option>
+                <option value="price_asc">{t('sortPriceLowHigh')}</option>
+                <option value="km_desc">{t('sortKmHighLow')}</option>
+                <option value="km_asc">{t('sortKmLowHigh')}</option>
+                <option value="year_desc">{t('sortYearHighLow')}</option>
+                <option value="year_asc">{t('sortYearLowHigh')}</option>
               </select>
             </div>
           </div>
@@ -298,12 +335,10 @@ function SearchContent() {
 
         {/* Main Grid: Left Filter Sidebar + Right Listings */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-          {/* Desktop Left Sidebar Filters */}
           <div className="hidden lg:block lg:col-span-1 bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs sticky top-24">
             <FilterControls />
           </div>
 
-          {/* Right Listings Results */}
           <div className="lg:col-span-3">
             {loading ? (
               <div className="py-24 text-center">
@@ -342,7 +377,7 @@ function SearchContent() {
           </div>
         </div>
 
-        {/* Mobile Filter Drawer / Modal */}
+        {/* Mobile Filter Modal */}
         {mobileFilterOpen && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
             <div className="bg-white rounded-t-3xl sm:rounded-3xl border border-slate-200 p-6 w-full max-w-md max-h-[85vh] overflow-y-auto shadow-2xl animate-in slide-in-from-bottom duration-200">
