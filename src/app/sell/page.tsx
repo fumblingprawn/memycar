@@ -118,6 +118,11 @@ export default function SellPage() {
     setErrorMsg(null);
 
     try {
+      // 1. Get currently logged-in user if available
+      const { data: authData } = await supabase.auth.getUser();
+      const currentUserId = authData?.user?.id || null;
+
+      // 2. Upload vehicle photos
       const uploadedImageUrls: string[] = [];
       for (const key of Object.keys(photoSlots) as PhotoSlotKey[]) {
         const file = photoSlots[key];
@@ -133,6 +138,7 @@ export default function SellPage() {
         uploadedImageUrls.push(url);
       }
 
+      // 3. Upload service document photos
       const uploadedServiceUrls: string[] = [];
       for (const doc of serviceDocs) {
         const url = await uploadFileToSupabase(doc, 'car-photos');
@@ -143,6 +149,7 @@ export default function SellPage() {
       const finalModel = (formData.model === 'Other' || formData.make === 'Other') && formData.custom_model ? formData.custom_model.trim() : formData.model;
 
       const payload = {
+        user_id: currentUserId,
         make: finalMake,
         model: finalModel,
         year: parseInt(formData.year, 10) || new Date().getFullYear(),

@@ -21,6 +21,25 @@ export const DICTIONARY: Record<string, { en: string; ar: string }> = {
   'listingRemovedMsg': { en: 'This vehicle may have been sold or removed.', ar: 'قد تكون هذه السيارة قد بيعت أو تم حذفها.' },
   'inspectZoom': { en: 'Inspect & Zoom', ar: 'تكبير وفحص' },
 
+  // Auth & Dashboard
+  'login': { en: 'Log In', ar: 'تسجيل الدخول' },
+  'signup': { en: 'Sign Up', ar: 'إنشاء حساب' },
+  'logout': { en: 'Log Out', ar: 'تسجيل الخروج' },
+  'dashboard': { en: 'My Dashboard', ar: 'لوحة التحكم' },
+  'myListings': { en: 'My Vehicles for Sale', ar: 'سياراتي المعروضة للبيع' },
+  'savedCars': { en: 'Saved Listings', ar: 'السيارات المحفوظة' },
+  'accountSettings': { en: 'Account', ar: 'حسابي' },
+  'noListingsYet': { en: 'You haven’t listed any cars for sale yet.', ar: 'لم تقم بعرض أي سيارة للبيع بعد.' },
+  'noSavedCars': { en: 'No saved cars yet. Click save on any car to find it here.', ar: 'لا توجد سيارات محفوظة بعد. اضغط حفظ على أي سيارة لتظهر هنا.' },
+  'manageCar': { en: 'Manage', ar: 'إدارة' },
+  'deleteCar': { en: 'Delete Listing', ar: 'حذف الإعلان' },
+  'confirmDelete': { en: 'Are you sure you want to delete this listing?', ar: 'هل أنت متأكد من حذف هذا الإعلان؟' },
+  'email': { en: 'Email Address', ar: 'البريد الإلكتروني' },
+  'password': { en: 'Password', ar: 'كلمة المرور' },
+  'signInWithEmail': { en: 'Sign In', ar: 'تسجيل الدخول' },
+  'dontHaveAccount': { en: "Don't have an account?", ar: 'ليس لديك حساب؟' },
+  'alreadyHaveAccount': { en: 'Already have an account?', ar: 'لديك حساب بالفعل؟' },
+
   // Landing Page & Footer
   'featuredTitle': { en: 'Featured & Latest Additions', ar: 'أحدث السيارات والمختارة' },
   'featuredSubtitle': { en: 'Explore handpicked UAE verified pre-owned cars', ar: 'استكشف سيارات موثقة ومختارة في الإمارات' },
@@ -140,7 +159,7 @@ export const DICTIONARY: Record<string, { en: string; ar: string }> = {
   'Umm Al Quwain': { en: 'Umm Al Quwain', ar: 'أم القيوين' },
   'Other': { en: 'Other', ar: 'أخرى' },
 
-  // ALL 144 BRANDS FROM CSV IN ARABIC
+  // All 144 Brands
   '212': { en: '212', ar: '212' },
   'AION': { en: 'AION', ar: 'آيون' },
   'AITO': { en: 'AITO', ar: 'آيتو' },
