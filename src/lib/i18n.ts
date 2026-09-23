@@ -1,6 +1,16 @@
 export type Locale = 'en' | 'ar';
 
 export const DICTIONARY: Record<string, { en: string; ar: string }> = {
+  // Terms & Conditions Modal
+  "termsModalTitle": { en: "Seller Declaration & Terms", ar: "إقرار وتعهد البائع" },
+  "termsModalDesc": { en: "Please confirm your agreement before publishing this vehicle listing across the UAE.", ar: "يرجى تأكيد موافقتك على الشروط قبل نشر الإعلان في دولة الإمارات." },
+  "term1": { en: "I certify that I am the legal owner or authorized representative for this vehicle.", ar: "أقر بأنني المالك القانوني للسيارة أو مفوض رسمياً ببيعها." },
+  "term2": { en: "All specifications, mileage, accident history, and photos provided are accurate.", ar: "أؤكد دقة كافة البيانات والمواصفات والمسافة المقطوعة والصور المرفقة." },
+  "term3": { en: "The vehicle is ready for physical chassis and RTA inspection upon buyer request.", ar: "المركبة جاهزة للفحص الفني وفحص الشاسيه وهيئة الطرق والمواصلات عند طلب المشتري." },
+  "termsAgreeCheckbox": { en: "I agree to memycar Terms of Service & UAE Listing Guidelines", ar: "أوافق على شروط الخدمة وضوابط النشر في الإمارات" },
+  "confirmAndPublish": { en: "Confirm & Publish Listing", ar: "تأكيد ونشر الإعلان" },
+  "cancel": { en: "Cancel", ar: "إلغاء" },
+
   // Navigation & General
   'search': { en: 'Search', ar: 'بحث' },
   'sellCar': { en: '+ Sell Your Car', ar: '+ بيع سيارتك' },

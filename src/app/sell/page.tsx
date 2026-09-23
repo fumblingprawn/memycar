@@ -1,13 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { carData, years } from '@/lib/constants/car-data';
 import PhotoSlotUploader from '@/components/sell/PhotoSlotUploader';
 import { PhotoSlotKey } from '@/types/listing';
 import { useLanguage } from '@/context/LanguageContext';
-import { CheckCircle2, ChevronRight, Car, Camera, FileText, User, Trash2, UploadCloud } from 'lucide-react';
+import { 
+  CheckCircle2, 
+  ChevronRight, 
+  Car, 
+  Camera, 
+  FileText, 
+  User, 
+  Trash2, 
+  UploadCloud, 
+  ShieldCheck, 
+  X,
+  AlertCircle
+} from 'lucide-react';
 
 export default function SellPage() {
   const router = useRouter();
@@ -17,6 +29,10 @@ export default function SellPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Terms Modal State
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const [formData, setFormData] = useState({
     make: '',
@@ -44,6 +60,21 @@ export default function SellPage() {
     seller_name: '',
     seller_phone: '',
   });
+
+  // Auto-fill logged-in user details
+  useEffect(() => {
+    async function loadUser() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setFormData((prev) => ({
+          ...prev,
+          seller_name: prev.seller_name || user.user_metadata?.full_name || user.email?.split('@')[0] || '',
+          seller_phone: prev.seller_phone || user.user_metadata?.phone || user.phone || '',
+        }));
+      }
+    }
+    loadUser();
+  }, [supabase]);
 
   const [photoSlots, setPhotoSlots] = useState<Record<PhotoSlotKey, File | null>>({
     front_three_quarter: null,
@@ -112,17 +143,24 @@ export default function SellPage() {
     return publicData.publicUrl;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Form submit button triggers the Terms Modal first
+  const handlePreSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setShowTermsModal(true);
+  };
+
+  // Final Publish after agreeing to terms
+  const handleFinalPublish = async () => {
+    if (!agreedToTerms) return;
+    setShowTermsModal(false);
     setLoading(true);
     setErrorMsg(null);
 
     try {
-      // 1. Get currently logged-in user if available
       const { data: authData } = await supabase.auth.getUser();
       const currentUserId = authData?.user?.id || null;
 
-      // 2. Upload vehicle photos
+      // 1. Upload Vehicle Photos
       const uploadedImageUrls: string[] = [];
       for (const key of Object.keys(photoSlots) as PhotoSlotKey[]) {
         const file = photoSlots[key];
@@ -138,7 +176,7 @@ export default function SellPage() {
         uploadedImageUrls.push(url);
       }
 
-      // 3. Upload service document photos
+      // 2. Upload Service Document Photos
       const uploadedServiceUrls: string[] = [];
       for (const doc of serviceDocs) {
         const url = await uploadFileToSupabase(doc, 'car-photos');
@@ -147,8 +185,10 @@ export default function SellPage() {
 
       const finalMake = formData.make === 'Other' && formData.custom_make ? formData.custom_make.trim() : formData.make;
       const finalModel = (formData.model === 'Other' || formData.make === 'Other') && formData.custom_model ? formData.custom_model.trim() : formData.model;
+      const sellerDisplayName = formData.seller_name || authData?.user?.email?.split('@')[0] || (isAr ? 'مالك السيارة' : 'Vehicle Owner');
+      const sellerDisplayPhone = formData.seller_phone || null;
 
-      const payload = {
+      const payload: any = {
         user_id: currentUserId,
         make: finalMake,
         model: finalModel,
@@ -171,8 +211,10 @@ export default function SellPage() {
         last_service_date: formData.last_service_date || null,
         service_notes: formData.service_notes || null,
         service_record_urls: uploadedServiceUrls,
-        seller_name: formData.seller_name || (isAr ? 'مالك السيارة' : 'Vehicle Owner'),
-        seller_phone: formData.seller_phone || null,
+        seller_name: sellerDisplayName,
+        seller_phone: sellerDisplayPhone,
+        contact_name: sellerDisplayName,
+        contact_phone: sellerDisplayPhone,
         image_urls: uploadedImageUrls,
       };
 
@@ -214,10 +256,11 @@ export default function SellPage() {
             </p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handlePreSubmit} className="space-y-6">
             {errorMsg && (
-              <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-semibold">
-                {errorMsg}
+              <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{errorMsg}</span>
               </div>
             )}
 
@@ -231,7 +274,7 @@ export default function SellPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* 1. Make */}
+                {/* Make */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('make')} *</label>
                   <select
@@ -249,7 +292,6 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* Custom Make if "Other" */}
                 {formData.make === 'Other' && (
                   <div>
                     <label className="text-xs font-semibold text-slate-700 block mb-1">
@@ -266,7 +308,7 @@ export default function SellPage() {
                   </div>
                 )}
 
-                {/* 2. Model */}
+                {/* Model */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('model')} *</label>
                   <select
@@ -285,7 +327,6 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* Custom Model if "Other" */}
                 {(formData.model === 'Other' || formData.make === 'Other') && (
                   <div>
                     <label className="text-xs font-semibold text-slate-700 block mb-1">
@@ -294,7 +335,7 @@ export default function SellPage() {
                     <input
                       required
                       type="text"
-                      placeholder="e.g. Air Sapphire"
+                      placeholder="e.g. Air Sapphire, ML500"
                       value={formData.custom_model}
                       onChange={(e) => setFormData({ ...formData, custom_model: e.target.value })}
                       className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
@@ -302,7 +343,7 @@ export default function SellPage() {
                   </div>
                 )}
 
-                {/* 3. Year */}
+                {/* Year */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('year')} *</label>
                   <select
@@ -318,7 +359,7 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* 4. Trim */}
+                {/* Trim */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('trim')}</label>
                   <input
@@ -330,7 +371,7 @@ export default function SellPage() {
                   />
                 </div>
 
-                {/* 5. Transmission */}
+                {/* Transmission */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('transmission')} *</label>
                   <select
@@ -345,7 +386,7 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* 6. Regional Specs */}
+                {/* Regional Specs */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('specs')} *</label>
                   <select
@@ -362,7 +403,7 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* 7. Mileage */}
+                {/* Mileage */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('mileageKm')} *</label>
                   <input
@@ -375,7 +416,7 @@ export default function SellPage() {
                   />
                 </div>
 
-                {/* 8. Price */}
+                {/* Price */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('priceAed')} *</label>
                   <input
@@ -388,7 +429,7 @@ export default function SellPage() {
                   />
                 </div>
 
-                {/* 9. Location / Emirate */}
+                {/* Location */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('emirate')} *</label>
                   <select
@@ -404,7 +445,7 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* 10. Accident History */}
+                {/* Accident History */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('accidentHistory')} *</label>
                   <select
@@ -420,7 +461,7 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* 11. Warranty Status */}
+                {/* Warranty */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('warranty')} *</label>
                   <select
@@ -436,7 +477,7 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* 12. Horse Power (HP) */}
+                {/* Horse Power (HP) */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('horsepower')}</label>
                   <input
@@ -448,7 +489,7 @@ export default function SellPage() {
                   />
                 </div>
 
-                {/* 13. Cylinders */}
+                {/* Cylinders */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('cylinders')}</label>
                   <select
@@ -463,7 +504,7 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* 14. Body Type */}
+                {/* Body Type */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('bodyType')}</label>
                   <select
@@ -478,7 +519,7 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* 15. Previous Owners */}
+                {/* Previous Owners */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('previousOwners')} *</label>
                   <select
@@ -495,7 +536,7 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* 16. Exterior Color */}
+                {/* Exterior Color */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('exteriorColor')}</label>
                   <input
@@ -607,7 +648,7 @@ export default function SellPage() {
               </div>
             </div>
 
-            {/* STEP 4: SELLER DETAILS */}
+            {/* STEP 4: SELLER DETAILS (Auto-Filled from Account) */}
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <User className="w-4 h-4 text-[#e03a14]" />
@@ -655,6 +696,79 @@ export default function SellPage() {
               <ChevronRight className="w-4 h-4" />
             </button>
           </form>
+        )}
+
+        {/* TERMS & CONDITIONS POPUP MODAL */}
+        {showTermsModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-lg w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-[#e03a14]" />
+                  <h3 className="text-base font-black text-slate-900">
+                    {t('termsModalTitle')}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowTermsModal(false)}
+                  className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-500 mb-5 leading-relaxed">
+                {t('termsModalDesc')}
+              </p>
+
+              <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 text-xs text-slate-700 leading-normal mb-5">
+                <div className="flex items-start gap-2">
+                  <span className="text-[#e03a14] font-black">•</span>
+                  <span>{t('term1')}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-[#e03a14] font-black">•</span>
+                  <span>{t('term2')}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-[#e03a14] font-black">•</span>
+                  <span>{t('term3')}</span>
+                </div>
+              </div>
+
+              {/* Checkbox */}
+              <label className="flex items-center gap-2.5 cursor-pointer select-none mb-6">
+                <input
+                  type="checkbox"
+                  checked={agreedToTerms}
+                  onChange={(e) => setAgreedToTerms(e.target.checked)}
+                  className="w-4 h-4 rounded text-[#e03a14] focus:ring-[#e03a14] border-slate-300"
+                />
+                <span className="text-xs font-bold text-slate-800">
+                  {t('termsAgreeCheckbox')}
+                </span>
+              </label>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowTermsModal(false)}
+                  className="py-2.5 px-4 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold transition"
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  type="button"
+                  disabled={!agreedToTerms}
+                  onClick={handleFinalPublish}
+                  className="bg-[#e03a14] hover:bg-[#c53210] disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition shadow-sm"
+                >
+                  {t('confirmAndPublish')}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
