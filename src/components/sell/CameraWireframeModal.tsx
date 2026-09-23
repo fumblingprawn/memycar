@@ -24,8 +24,8 @@ export default function CameraWireframeModal({
 
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [videoReady, setVideoReady] = useState(false);
   const [capturing, setCapturing] = useState(false);
-  const [hasStream, setHasStream] = useState(false);
 
   const stopTracks = useCallback(() => {
     if (streamRef.current) {
@@ -35,68 +35,76 @@ export default function CameraWireframeModal({
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
-    setHasStream(false);
+    setVideoReady(false);
   }, []);
 
-  const initCamera = useCallback(async () => {
+  const startStream = useCallback(async () => {
     stopTracks();
     setIsInitializing(true);
     setError(null);
+    setVideoReady(false);
 
     if (!navigator?.mediaDevices?.getUserMedia) {
-      setError('Live camera viewfinder is not supported on this browser. Use standard upload or device camera.');
+      setError('Live camera viewfinder is not supported on this browser. Use standard device camera.');
       setIsInitializing(false);
       return;
     }
 
+    let mediaStream: MediaStream | null = null;
+
     try {
-      // Attempt 1: Environment (rear) camera
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
+      // 1. Try mobile rear camera first
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
         audio: false,
       });
-
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => {});
-      }
-      setHasStream(true);
-    } catch (envErr) {
-      console.warn('Environment camera failed, attempting standard camera:', envErr);
+    } catch (e1) {
+      console.warn('Rear camera unavailable, trying any camera:', e1);
       try {
-        // Attempt 2: Default camera (handles Mac/PC webcams or restricted browsers)
-        const fallbackStream = await navigator.mediaDevices.getUserMedia({
+        // 2. Fallback to any camera (laptop webcam, front camera)
+        mediaStream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: false,
         });
-
-        streamRef.current = fallbackStream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = fallbackStream;
-          await videoRef.current.play().catch(() => {});
-        }
-        setHasStream(true);
-      } catch (err: any) {
-        console.error('Camera access failed:', err);
-        setError(err?.message || 'Camera permission denied or camera unavailable.');
+      } catch (e2: any) {
+        console.error('All camera attempts failed:', e2);
+        setError(e2?.message || 'Camera permission denied or camera is currently busy.');
+        setIsInitializing(false);
+        return;
       }
-    } finally {
+    }
+
+    if (mediaStream && videoRef.current) {
+      streamRef.current = mediaStream;
+      videoRef.current.srcObject = mediaStream;
+      
+      videoRef.current.onloadedmetadata = async () => {
+        try {
+          if (videoRef.current) {
+            await videoRef.current.play();
+            setVideoReady(true);
+          }
+        } catch (playErr) {
+          console.warn('Video play interrupted:', playErr);
+        } finally {
+          setIsInitializing(false);
+        }
+      };
+    } else {
       setIsInitializing(false);
     }
   }, [stopTracks]);
 
   useEffect(() => {
     if (isOpen) {
-      initCamera();
+      startStream();
     } else {
       stopTracks();
     }
-
     return () => {
       stopTracks();
     };
-  }, [isOpen, initCamera, stopTracks]);
+  }, [isOpen, startStream, stopTracks]);
 
   const captureImage = () => {
     if (!videoRef.current || !canvasRef.current || !streamRef.current) return;
@@ -124,12 +132,12 @@ export default function CameraWireframeModal({
         0.92
       );
     } catch (err) {
-      console.error('Capture failed:', err);
+      console.error('Capture error:', err);
       setCapturing(false);
     }
   };
 
-  const handleFallbackFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNativeFallback = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       onImageCapture(file);
@@ -140,11 +148,11 @@ export default function CameraWireframeModal({
 
   if (!isOpen) return null;
 
-  const renderCarSilhouette = () => {
+  const renderSilhouette = () => {
     switch (slotKey) {
       case 'front_three_quarter':
         return (
-          <svg className="w-full h-full max-h-[75vh] text-white/80 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
+          <svg className="w-full h-full max-h-[75vh] text-white/85 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
             <path strokeWidth="3" strokeDasharray="8 6" d="
               M 110,340 
               C 120,320 150,305 180,305 
@@ -164,8 +172,6 @@ export default function CameraWireframeModal({
             <circle cx="180" cy="355" r="50" strokeWidth="3.5" strokeDasharray="6 4" />
             <circle cx="635" cy="340" r="45" strokeWidth="3.5" strokeDasharray="6 4" />
             <path strokeWidth="2.5" strokeDasharray="5 5" d="M 300,140 L 470,140 L 450,230 L 220,230 Z" />
-            <path strokeWidth="2" strokeDasharray="4 4" d="M 320,140 L 305,230" />
-            <path strokeWidth="2" strokeDasharray="4 4" d="M 110,285 C 140,280 180,275 220,270" />
             <text x="50%" y="60" fill="currentColor" textAnchor="middle" fontSize="18" fontWeight="bold" letterSpacing="1">
               ALIGN FRONT 3/4 (DRIVER + HOOD)
             </text>
@@ -174,7 +180,7 @@ export default function CameraWireframeModal({
 
       case 'rear_three_quarter':
         return (
-          <svg className="w-full h-full max-h-[75vh] text-white/80 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
+          <svg className="w-full h-full max-h-[75vh] text-white/85 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
             <path strokeWidth="3" strokeDasharray="8 6" d="
               M 700,340 
               C 690,320 660,305 630,305 
@@ -202,10 +208,9 @@ export default function CameraWireframeModal({
 
       case 'side_profile':
         return (
-          <svg className="w-full h-full max-h-[75vh] text-white/80 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
+          <svg className="w-full h-full max-h-[75vh] text-white/85 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
             <path strokeWidth="3" strokeDasharray="8 6" d="
-              M 60,360 
-              L 120,360 
+              M 60,360 L 120,360 
               C 130,305 180,275 240,275 
               C 300,275 350,305 360,360 
               L 540,360 
@@ -213,17 +218,14 @@ export default function CameraWireframeModal({
               C 720,275 770,305 780,360 
               L 790,360 
               C 795,310 770,250 720,230 
-              L 560,210 
-              L 460,110 
+              L 560,210 L 460,110 
               C 430,95 320,95 260,115 
-              L 160,210 
-              L 70,240 
+              L 160,210 L 70,240 
               C 40,265 40,320 60,360 Z
             " />
             <circle cx="240" cy="355" r="55" strokeWidth="3.5" strokeDasharray="6 4" />
             <circle cx="660" cy="355" r="55" strokeWidth="3.5" strokeDasharray="6 4" />
             <path strokeWidth="2.5" strokeDasharray="5 5" d="M 270,125 L 440,125 L 530,205 L 185,205 Z" />
-            <line x1="365" y1="125" x2="365" y2="205" strokeWidth="2" strokeDasharray="4 4" />
             <text x="50%" y="60" fill="currentColor" textAnchor="middle" fontSize="18" fontWeight="bold" letterSpacing="1">
               ALIGN FULL SIDE PROFILE (LEVEL)
             </text>
@@ -232,13 +234,10 @@ export default function CameraWireframeModal({
 
       case 'interior_dash':
         return (
-          <svg className="w-full h-full max-h-[75vh] text-white/80 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
+          <svg className="w-full h-full max-h-[75vh] text-white/85 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
             <ellipse cx="260" cy="300" rx="100" ry="115" strokeWidth="3.5" strokeDasharray="8 6" />
             <circle cx="260" cy="300" r="35" strokeWidth="2" strokeDasharray="4 4" />
-            <line x1="160" y1="300" x2="225" y2="300" strokeWidth="2.5" strokeDasharray="4 4" />
-            <line x1="295" y1="300" x2="360" y2="300" strokeWidth="2.5" strokeDasharray="4 4" />
             <rect x="420" y="210" width="220" height="150" rx="14" strokeWidth="3" strokeDasharray="6 4" />
-            <path strokeWidth="2.5" strokeDasharray="6 4" d="M 80,240 C 200,210 380,180 720,200" />
             <text x="50%" y="60" fill="currentColor" textAnchor="middle" fontSize="18" fontWeight="bold" letterSpacing="1">
               FRAME COCKPIT (STEERING + CENTER SCREEN)
             </text>
@@ -248,7 +247,7 @@ export default function CameraWireframeModal({
       case 'odometer':
       default:
         return (
-          <svg className="w-full h-full max-h-[75vh] text-white/80 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
+          <svg className="w-full h-full max-h-[75vh] text-white/85 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
             <rect x="160" y="140" width="480" height="240" rx="28" strokeWidth="3.5" strokeDasharray="8 6" />
             <circle cx="280" cy="260" r="65" strokeWidth="2" strokeDasharray="4 4" />
             <circle cx="520" cy="260" r="65" strokeWidth="2" strokeDasharray="4 4" />
@@ -263,9 +262,9 @@ export default function CameraWireframeModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between select-none">
-      {/* Top Bar */}
-      <div className="flex items-center justify-between p-4 z-20 bg-gradient-to-b from-black/80 to-transparent">
-        <span className="text-white text-xs font-bold uppercase tracking-wider bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/15">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 z-30 bg-gradient-to-b from-black/90 to-transparent">
+        <span className="text-white text-xs font-bold uppercase tracking-wider bg-white/10 px-3 py-1.5 rounded-full border border-white/20">
           {slotKey.replace(/_/g, ' ')}
         </span>
         <button
@@ -274,23 +273,38 @@ export default function CameraWireframeModal({
             stopTracks();
             onClose();
           }}
-          className="text-white p-2 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 transition"
+          className="text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition"
         >
           <X className="w-6 h-6" />
         </button>
       </div>
 
-      {/* Viewfinder Viewport */}
+      {/* Viewport */}
       <div className="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden bg-black">
-        {isInitializing ? (
-          <div className="flex flex-col items-center gap-3 text-white">
+        {/* The video element remains in the DOM so refs and play() always attach cleanly */}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+            videoReady ? 'opacity-100' : 'opacity-0'
+          }`}
+        />
+
+        {/* Loading Spinner */}
+        {isInitializing && (
+          <div className="flex flex-col items-center gap-3 text-white z-20">
             <Loader2 className="w-8 h-8 animate-spin text-[#e03a14]" />
             <span className="text-xs font-medium">Opening camera...</span>
           </div>
-        ) : error ? (
-          <div className="text-center p-6 bg-slate-900/90 border border-slate-700 rounded-3xl max-w-sm mx-4 text-slate-200 shadow-2xl">
+        )}
+
+        {/* Error Fallback Box */}
+        {error && (
+          <div className="text-center p-6 bg-slate-900 border border-slate-700 rounded-3xl max-w-sm mx-4 text-slate-200 shadow-2xl z-30">
             <CameraOff className="w-10 h-10 mx-auto mb-3 text-amber-400" />
-            <h3 className="text-sm font-bold text-white mb-1">Camera Unavailable</h3>
+            <h3 className="text-sm font-bold text-white mb-1">Camera Stream Blocked</h3>
             <p className="text-xs text-slate-400 mb-5 leading-relaxed">{error}</p>
             
             <div className="flex flex-col gap-2">
@@ -299,11 +313,11 @@ export default function CameraWireframeModal({
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full bg-[#e03a14] hover:bg-[#c53210] text-white py-3 rounded-xl font-bold text-xs shadow-md transition"
               >
-                Take Photo with Device App
+                Take Photo with Native Camera
               </button>
               <button
                 type="button"
-                onClick={initCamera}
+                onClick={startStream}
                 className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition"
               >
                 <RefreshCw className="w-3.5 h-3.5" /> Retry Permission
@@ -316,34 +330,29 @@ export default function CameraWireframeModal({
               accept="image/*"
               capture="environment"
               className="hidden"
-              onChange={handleFallbackFile}
+              onChange={handleNativeFallback}
             />
           </div>
-        ) : (
-          <>
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-4">
-              {renderCarSilhouette()}
-            </div>
-          </>
         )}
+
+        {/* Wireframe Silhouette */}
+        {videoReady && !error && (
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-4 z-20">
+            {renderSilhouette()}
+          </div>
+        )}
+
         <canvas ref={canvasRef} className="hidden" />
       </div>
 
-      {/* Bottom Controls */}
-      <div className="p-6 flex items-center justify-center bg-gradient-to-t from-black/90 via-black/50 to-transparent z-20">
-        {hasStream && !error && !isInitializing && (
+      {/* Shutter Button */}
+      <div className="p-6 flex items-center justify-center bg-gradient-to-t from-black/90 to-transparent z-30">
+        {videoReady && !error && (
           <button
             type="button"
             disabled={capturing}
             onClick={captureImage}
-            className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center bg-[#e03a14] hover:bg-[#c53210] active:scale-90 transition-transform shadow-2xl disabled:opacity-50"
+            className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center bg-[#e03a14] hover:bg-[#c53210] active:scale-95 transition-transform shadow-2xl disabled:opacity-50"
           >
             {capturing ? (
               <Loader2 className="w-8 h-8 text-white animate-spin" />
