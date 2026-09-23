@@ -14,7 +14,11 @@ import {
   PlusCircle, 
   Trash2, 
   ExternalLink,
-  ShieldCheck
+  ShieldCheck,
+  Phone,
+  CheckCircle2,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -28,6 +32,13 @@ export default function DashboardPage() {
   const [savedListings, setSavedListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Profile Form State
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileSuccess, setProfileSuccess] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
   const fetchUserData = useCallback(async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -38,6 +49,8 @@ export default function DashboardPage() {
     }
 
     setUser(user);
+    setFullName(user.user_metadata?.full_name || '');
+    setPhone(user.user_metadata?.phone || '');
 
     // 1. Fetch user's listings
     const { data: listings } = await supabase
@@ -48,7 +61,7 @@ export default function DashboardPage() {
 
     if (listings) setMyListings(listings);
 
-    // 2. Fetch user's saved listings IDs first, then get cars
+    // 2. Fetch user's saved listings
     const { data: savedRows } = await supabase
       .from('saved_listings')
       .select('listing_id')
@@ -72,6 +85,57 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchUserData();
   }, [fetchUserData]);
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileSaving(true);
+    setProfileSuccess(false);
+    setProfileError(null);
+
+    // Validate UAE phone number pattern: +971 5X XXX XXXX or 05X XXX XXXX
+    const cleanPhone = phone.replace(/[\s-]/g, '');
+    const uaePhoneRegex = /^(?:\+971|00971|0)?5[024568]\d{7}$/;
+
+    if (!uaePhoneRegex.test(cleanPhone)) {
+      setProfileError(
+        isAr 
+          ? 'يرجى إدخال رقم هاتف إماراتي متحرك صحيح (مثال: 0501234567 أو +971501234567)' 
+          : 'Please enter a valid UAE mobile number (e.g., +971 50 123 4567 or 050 123 4567)'
+      );
+      setProfileSaving(false);
+      return;
+    }
+
+    try {
+      // Format number to international UAE standard
+      let formattedPhone = cleanPhone;
+      if (formattedPhone.startsWith('05')) {
+        formattedPhone = '+971' + formattedPhone.slice(1);
+      } else if (!formattedPhone.startsWith('+')) {
+        formattedPhone = '+' + formattedPhone;
+      }
+
+      const { data, error } = await supabase.auth.updateUser({
+        data: {
+          full_name: fullName.trim(),
+          phone: formattedPhone,
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        setUser(data.user);
+        setPhone(formattedPhone);
+        setProfileSuccess(true);
+        setTimeout(() => setProfileSuccess(false), 3000);
+      }
+    } catch (err: any) {
+      setProfileError(err?.message || 'Failed to update profile details.');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   const handleDeleteListing = async (listingId: string) => {
     if (!confirm(t('confirmDelete'))) return;
@@ -105,18 +169,28 @@ export default function DashboardPage() {
   return (
     <div className="min-h-[85vh] bg-[#f8f9fa] py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* User Card */}
+        {/* User Top Card */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-lg">
-              {user?.email?.charAt(0).toUpperCase()}
+              {(fullName || user?.email)?.charAt(0).toUpperCase()}
             </div>
             <div>
-              <h1 className="text-lg font-black text-slate-900">{user?.email}</h1>
-              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                {isAr ? 'عضو موثق في ميميكار' : 'Verified memycar Member'}
-              </span>
+              <h1 className="text-lg font-black text-slate-900">
+                {fullName || user?.email}
+              </h1>
+              <div className="flex items-center gap-3 mt-0.5 text-xs">
+                <span className="text-emerald-600 font-semibold flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  {isAr ? 'عضو موثق في ميميكار' : 'Verified memycar Member'}
+                </span>
+                {user?.user_metadata?.phone && (
+                  <span className="text-slate-500 font-medium flex items-center gap-1" dir="ltr">
+                    <Phone className="w-3 h-3 text-slate-400" />
+                    {user.user_metadata.phone}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -138,7 +212,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Tab Controls */}
         <div className="flex gap-2 border-b border-slate-200 mb-6 pb-2">
           <button
             onClick={() => setActiveTab('listings')}
@@ -177,7 +251,7 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* Tab 1: My Cars */}
+        {/* TAB 1: MY CARS FOR SALE */}
         {activeTab === 'listings' && (
           <div>
             {myListings.length === 0 ? (
@@ -246,7 +320,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Tab 2: Saved Cars */}
+        {/* TAB 2: SAVED CARS */}
         {activeTab === 'saved' && (
           <div>
             {savedListings.length === 0 ? (
@@ -270,24 +344,103 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Tab 3: Account */}
+        {/* TAB 3: ACCOUNT & CONTACT SETTINGS */}
         {activeTab === 'account' && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-lg shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-              {t('accountSettings')}
-            </h3>
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-lg shadow-sm space-y-6">
             <div>
-              <span className="text-xs text-slate-400 block">{t('email')}</span>
-              <span className="text-sm font-bold text-slate-800">{user?.email}</span>
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                {isAr ? 'بيانات البائع والحساب' : 'Seller Profile & Contact'}
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                {isAr 
+                  ? 'سيتم استخدام هذا الاسم ورقم الهاتف تلقائياً في كافة إعلانات سياراتك المعروضة للبيع.'
+                  : 'This name and phone number will be used automatically on all your vehicle listings.'}
+              </p>
             </div>
-            <div>
-              <span className="text-xs text-slate-400 block">User ID</span>
-              <span className="text-xs font-mono text-slate-500 break-all">{user?.id}</span>
-            </div>
-            <div className="pt-4 border-t border-slate-100">
+
+            {profileError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{profileError}</span>
+              </div>
+            )}
+
+            {profileSuccess && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl flex items-center gap-2 font-bold">
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                <span>{isAr ? 'تم تحديث بياناتك بنجاح!' : 'Profile updated successfully!'}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
+              {/* Email (Read-only) */}
+              <div>
+                <label className="text-xs font-semibold text-slate-500 block mb-1">
+                  {t('email')}
+                </label>
+                <input
+                  disabled
+                  type="email"
+                  value={user?.email || ''}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 text-slate-500"
+                />
+              </div>
+
+              {/* Full Name / Dealer Name */}
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  {isAr ? 'اسم البائع / المعرض *' : 'Seller / Display Name *'}
+                </label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. Salim Al Nuaimi / Apex Motors"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14]"
+                />
+              </div>
+
+              {/* Phone Number with UAE Validation */}
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  {isAr ? 'رقم الهاتف / الواتساب في الإمارات *' : 'UAE Phone / WhatsApp *'}
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    required
+                    type="tel"
+                    dir="ltr"
+                    placeholder="+971 50 123 4567 or 0501234567"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14]"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  {isAr ? 'أرقام الهواتف المحمولة المعتمدة: 050، 052، 054، 055، 056، 058' : 'Valid UAE carriers: 050, 052, 054, 055, 056, 058'}
+                </span>
+              </div>
+
+              <button
+                type="submit"
+                disabled={profileSaving}
+                className="bg-[#e03a14] hover:bg-[#c53210] disabled:bg-slate-300 text-white text-xs font-bold py-2.5 px-5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                {profileSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isAr ? 'حفظ التعديلات' : 'Save Changes'}
+              </button>
+            </form>
+
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+              <div>
+                <span className="text-xs text-slate-400 block">User ID</span>
+                <span className="text-[10px] font-mono text-slate-400 break-all">{user?.id}</span>
+              </div>
               <button
                 onClick={handleSignOut}
-                className="bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold py-2.5 px-4 rounded-xl transition"
+                className="bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold py-2 px-3 rounded-xl transition"
               >
                 {t('logout')}
               </button>

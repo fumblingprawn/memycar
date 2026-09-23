@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { carData, years } from '@/lib/constants/car-data';
 import PhotoSlotUploader from '@/components/sell/PhotoSlotUploader';
@@ -13,12 +14,12 @@ import {
   Car, 
   Camera, 
   FileText, 
-  User, 
   Trash2, 
   UploadCloud, 
   ShieldCheck, 
   X,
-  AlertCircle
+  AlertCircle,
+  PhoneCall
 } from 'lucide-react';
 
 export default function SellPage() {
@@ -26,6 +27,7 @@ export default function SellPage() {
   const supabase = createClient();
   const { t, isAr } = useLanguage();
 
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -57,24 +59,20 @@ export default function SellPage() {
     description: '',
     last_service_date: '',
     service_notes: '',
-    seller_name: '',
-    seller_phone: '',
   });
 
-  // Auto-fill logged-in user details
+  // Check login and fetch profile details
   useEffect(() => {
-    async function loadUser() {
+    async function checkAuth() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setFormData((prev) => ({
-          ...prev,
-          seller_name: prev.seller_name || user.user_metadata?.full_name || user.email?.split('@')[0] || '',
-          seller_phone: prev.seller_phone || user.user_metadata?.phone || user.phone || '',
-        }));
+      if (!user) {
+        router.push('/auth');
+        return;
       }
+      setCurrentUser(user);
     }
-    loadUser();
-  }, [supabase]);
+    checkAuth();
+  }, [supabase, router]);
 
   const [photoSlots, setPhotoSlots] = useState<Record<PhotoSlotKey, File | null>>({
     front_three_quarter: null,
@@ -145,6 +143,18 @@ export default function SellPage() {
 
   const handlePreSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check if seller has saved their phone in Account Settings
+    const userPhone = currentUser?.user_metadata?.phone;
+    if (!userPhone) {
+      setErrorMsg(
+        isAr
+          ? 'يرجى حفظ رقم هاتفك في صفحة الحساب قبل نشر الإعلان حتى يتمكن المشترون من الاتصال بك.'
+          : 'Please add and save your phone number in Account Settings before listing your vehicle.'
+      );
+      return;
+    }
+
     setShowTermsModal(true);
   };
 
@@ -155,9 +165,6 @@ export default function SellPage() {
     setErrorMsg(null);
 
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      const currentUserId = authData?.user?.id || null;
-
       // 1. Upload Vehicle Photos
       const uploadedImageUrls: string[] = [];
       for (const key of Object.keys(photoSlots) as PhotoSlotKey[]) {
@@ -186,15 +193,19 @@ export default function SellPage() {
       const finalYear = parseInt(formData.year, 10) || new Date().getFullYear();
       const finalTrim = formData.trim ? formData.trim.trim() : null;
 
-      // Construct Title required by not-null constraint
       const finalTitle = `${finalYear} ${finalMake} ${finalModel}${finalTrim ? ' ' + finalTrim : ''}`;
 
-      const sellerDisplayName = formData.seller_name || authData?.user?.email?.split('@')[0] || (isAr ? 'مالك السيارة' : 'Vehicle Owner');
-      const sellerDisplayPhone = formData.seller_phone || null;
+      // Automatically pull seller name and phone from account metadata
+      const sellerDisplayName = 
+        currentUser?.user_metadata?.full_name || 
+        currentUser?.email?.split('@')[0] || 
+        (isAr ? 'مالك السيارة' : 'Vehicle Owner');
+
+      const sellerDisplayPhone = currentUser?.user_metadata?.phone || '';
 
       const payload: any = {
         title: finalTitle,
-        user_id: currentUserId,
+        user_id: currentUser?.id,
         make: finalMake,
         model: finalModel,
         year: finalYear,
@@ -218,7 +229,7 @@ export default function SellPage() {
         service_record_urls: uploadedServiceUrls,
         seller_name: sellerDisplayName,
         seller_phone: sellerDisplayPhone,
-        whatsapp_number: sellerDisplayPhone || '',
+        whatsapp_number: sellerDisplayPhone,
         image_urls: uploadedImageUrls,
       };
 
@@ -237,17 +248,60 @@ export default function SellPage() {
     }
   };
 
+  const sellerPhoneExists = !!currentUser?.user_metadata?.phone;
+
   return (
     <div className="min-h-screen bg-[#f4f4f4] py-8">
       <div className="max-w-3xl mx-auto px-4">
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-6">
-          <h1 className="text-2xl font-black text-slate-900">
-            {isAr ? 'بيع سيارتك في الإمارات' : 'List Your Vehicle'}
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            {isAr ? 'انشر مواصفات سيارتك مباشرة للمشترين في كافة الإمارات.' : 'Publish verified UAE specs directly to buyers across all Emirates.'}
-          </p>
+        {/* Banner with Connected Account Details */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-black text-slate-900">
+              {isAr ? 'بيع سيارتك في الإمارات' : 'List Your Vehicle'}
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {isAr ? 'انشر مواصفات سيارتك مباشرة للمشترين في كافة الإمارات.' : 'Publish verified UAE specs directly to buyers across all Emirates.'}
+            </p>
+          </div>
+
+          {currentUser && (
+            <div className="bg-slate-50 border border-slate-200 py-2 px-3.5 rounded-xl text-xs flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <div>
+                <span className="font-bold text-slate-800 block">
+                  {currentUser.user_metadata?.full_name || currentUser.email}
+                </span>
+                <span className="text-[11px] text-slate-500" dir="ltr">
+                  {currentUser.user_metadata?.phone || (
+                    <Link href="/dashboard" className="text-[#e03a14] underline font-semibold">
+                      {isAr ? 'أضف رقم هاتفك في الحساب' : 'Add phone in Account'}
+                    </Link>
+                  )}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Warning if phone is not configured yet */}
+        {currentUser && !sellerPhoneExists && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-3 text-xs text-amber-900">
+            <div className="flex items-center gap-2.5">
+              <PhoneCall className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <span>
+                {isAr
+                  ? 'لم تقم بتحديد رقم هاتفك بعد. يرجى إضافته في إعدادات الحساب لتلقي اتصالات المشترين.'
+                  : 'You have not added a phone number yet. Add it to receive calls from buyers.'}
+              </span>
+            </div>
+            <Link
+              href="/dashboard"
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-1.5 px-3 rounded-lg flex-shrink-0 transition"
+            >
+              {isAr ? 'إضافة الرقم' : 'Add Phone'}
+            </Link>
+          </div>
+        )}
 
         {success ? (
           <div className="bg-white rounded-2xl border border-emerald-200 p-8 shadow-sm text-center">
@@ -648,45 +702,6 @@ export default function SellPage() {
                       />
                     </label>
                   )}
-                </div>
-              </div>
-            </div>
-
-            {/* STEP 4: SELLER DETAILS */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                <User className="w-4 h-4 text-[#e03a14]" />
-                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                  {t('step4')}
-                </h2>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    {isAr ? 'اسم البائع / المعرض *' : 'Seller Name *'}
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    placeholder="e.g. Private Owner / Al Futtaim Motors"
-                    value={formData.seller_name}
-                    onChange={(e) => setFormData({ ...formData, seller_name: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    {isAr ? 'رقم الهاتف / الواتساب *' : 'Contact Phone / WhatsApp *'}
-                  </label>
-                  <input
-                    required
-                    type="tel"
-                    placeholder="+971 50 123 4567"
-                    value={formData.seller_phone}
-                    onChange={(e) => setFormData({ ...formData, seller_phone: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
-                  />
                 </div>
               </div>
             </div>
