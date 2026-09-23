@@ -1,6 +1,22 @@
 export type Locale = 'en' | 'ar';
 
 export const DICTIONARY: Record<string, { en: string; ar: string }> = {
+  // Account Deletion, Views & Sorting
+  "deleteAccount": { en: "Delete Account", ar: "حذف الحساب نهائياً" },
+  "deleteAccountConfirm": { en: "Are you sure you want to permanently delete your account? All your vehicle listings, photos, and saved cars will be permanently wiped.", ar: "هل أنت متأكد من رغبتك في حذف حسابك نهائياً؟ سيتم حذف جميع إعلانات سياراتك وصورك وقوائمك المحفوظة فوراً." },
+  "deleteAccountBtn": { en: "Permanently Delete My Account", ar: "تأكيد حذف الحساب نهائياً" },
+  "accountDeletedNotice": { en: "Your account has been permanently deleted. A confirmation email has been sent.", ar: "تم حذف حسابك بنجاح. تم إرسال بريد إلكتروني لتأكيد الحذف." },
+  "sortBy": { en: "Sort By", ar: "ترتيب حسب" },
+  "newestFirst": { en: "Newest Added", ar: "الأحدث إضافةً" },
+  "oldestFirst": { en: "Oldest Added", ar: "الأقدم إضافةً" },
+  "priceLowHigh": { en: "Price: Low to High", ar: "السعر: من الأقل للأعلى" },
+  "priceHighLow": { en: "Price: High to Low", ar: "السعر: من الأعلى للأقل" },
+  "views": { en: "views", ar: "مشاهدة" },
+  "listed": { en: "Listed", ar: "أُضيف" },
+  "justNow": { en: "Just now", ar: "الآن" },
+  "daysAgo": { en: "days ago", ar: "أيام مضت" },
+  "hoursAgo": { en: "hours ago", ar: "ساعات مضت" },
+
   // Terms & Conditions Modal
   "termsModalTitle": { en: "Seller Declaration & Terms", ar: "إقرار وتعهد البائع" },
   "termsModalDesc": { en: "Please confirm your agreement before publishing this vehicle listing across the UAE.", ar: "يرجى تأكيد موافقتك على الشروط قبل نشر الإعلان في دولة الإمارات." },

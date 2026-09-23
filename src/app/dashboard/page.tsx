@@ -162,6 +162,36 @@ export default function DashboardPage() {
     }
   };
 
+  
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    setDeletingAccount(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + session.access_token,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!res.ok) throw new Error("Deletion failed");
+
+      await supabase.auth.signOut();
+      alert(t("accountDeletedNotice"));
+      router.push("/");
+      router.refresh();
+    } catch (e: any) {
+      alert(e.message || "Failed to delete account");
+      setDeletingAccount(false);
+    }
+  };
+  
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.push('/');
@@ -493,6 +523,52 @@ export default function DashboardPage() {
                 </button>
               )}
             </form>
+
+            {/* Danger Zone: Delete Account */}
+            <div className="pt-6 border-t border-red-100">
+              <h4 className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">
+                {t("deleteAccount")}
+              </h4>
+              <p className="text-[11px] text-slate-500 mb-3">
+                {t("deleteAccountConfirm")}
+              </p>
+              <button
+                type="button"
+                onClick={() => setDeleteModalOpen(true)}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 px-3.5 rounded-xl transition shadow-2xs"
+              >
+                {t("deleteAccountBtn")}
+              </button>
+            </div>
+
+            {/* Confirm Modal */}
+            {deleteModalOpen && (
+              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-sm w-full shadow-2xl">
+                  <h3 className="text-sm font-black text-slate-900 mb-2">{t("deleteAccount")}</h3>
+                  <p className="text-xs text-slate-600 mb-5 leading-relaxed">{t("deleteAccountConfirm")}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      disabled={deletingAccount}
+                      onClick={() => setDeleteModalOpen(false)}
+                      className="py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600"
+                    >
+                      {t("cancel")}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deletingAccount}
+                      onClick={handleDeleteAccount}
+                      className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white py-2 rounded-xl text-xs font-bold"
+                    >
+                      {deletingAccount ? "Deleting..." : t("deleteAccountBtn")}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+  
 
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
               <div>
