@@ -217,12 +217,9 @@ export default function SellPage() {
         service_notes: formData.service_notes || null,
         service_record_urls: uploadedServiceUrls,
         seller_name: sellerDisplayName,
-        seller_phone: sellerDisplayPhone,
-        contact_name: sellerDisplayName,
-        contact_phone: sellerDisplayPhone,
-        whatsapp_number: sellerDisplayPhone || "",
-        phone: sellerDisplayPhone || "",
-        image_urls: uploadedImageUrls,
+        seller_        contact_name: sellerDisplayName,
+        contact_        whatsapp_number: sellerDisplayPhone || "",
+                image_urls: uploadedImageUrls,
       };
 
       const { data, error } = await supabase.from('listings').insert([payload]).select();
