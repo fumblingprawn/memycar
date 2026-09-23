@@ -1,31 +1,71 @@
 'use client';
 
-import React, { useState } from 'react';
-import imageCompression from 'browser-image-compression';
-import { Camera, Trash2, Loader2, Plus, Car, Link2 } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Camera, Upload, Trash2, CheckCircle2, Plus } from 'lucide-react';
 import { PhotoSlotKey } from '@/types/listing';
 import CameraWireframeModal from './CameraWireframeModal';
+import { useLanguage } from '@/context/LanguageContext';
 
-interface PhotoSlotUploaderProps {
-  onChange: (slots: Record<PhotoSlotKey, File | null>, extras: File[], urls: Record<string, string>) => void;
-}
-
-interface SlotDefinition {
+interface PhotoSlotConfig {
   key: PhotoSlotKey;
-  label: string;
-  hint: string;
+  titleEn: string;
+  titleAr: string;
+  descEn: string;
+  descAr: string;
+  isCover?: boolean;
 }
 
-const REQUIRED_SLOTS: SlotDefinition[] = [
-  { key: 'front_three_quarter', label: 'Front 3/4 Angle (Cover)', hint: 'Front + Driver Side' },
-  { key: 'rear_three_quarter', label: 'Rear 3/4 Angle', hint: 'Rear + Passenger Side' },
-  { key: 'side_profile', label: 'Direct Side Profile', hint: 'Full flat side view' },
-  { key: 'interior_dash', label: 'Driver Cockpit & Dash', hint: 'Steering & Center Console' },
-  { key: 'odometer', label: 'Odometer / Cluster', hint: 'Clear mileage display' },
+const SLOTS: PhotoSlotConfig[] = [
+  {
+    key: 'front_three_quarter',
+    titleEn: 'Front 3/4 Angle (Cover)',
+    titleAr: 'زاوية أمامية ٣/٤ (الرئيسية)',
+    descEn: 'Front + Driver Side',
+    descAr: 'من الأمام + جانب السائق',
+    isCover: true,
+  },
+  {
+    key: 'rear_three_quarter',
+    titleEn: 'Rear 3/4 Angle',
+    titleAr: 'زاوية خلفية ٣/٤',
+    descEn: 'Rear + Passenger Side',
+    descAr: 'من الخلف + جانب الراكب',
+  },
+  {
+    key: 'side_profile',
+    titleEn: 'Direct Side Profile',
+    titleAr: 'زاوية جانبية كاملة',
+    descEn: 'Full flat side view',
+    descAr: 'المظهر الجانبي للسيارة',
+  },
+  {
+    key: 'interior_dash',
+    titleEn: 'Driver Cockpit & Dash',
+    titleAr: 'مقصورة السائق والعدادات',
+    descEn: 'Steering & Center Console',
+    descAr: 'المقود والكونسول الوسطي',
+  },
+  {
+    key: 'odometer',
+    titleEn: 'Odometer / Cluster',
+    titleAr: 'عداد المسافة (الكيلومترات)',
+    descEn: 'Clear mileage display',
+    descAr: 'شاشة واضحة لعداد المسافة',
+  },
 ];
 
+interface PhotoSlotUploaderProps {
+  onChange: (
+    slots: Record<PhotoSlotKey, File | null>,
+    extras: File[],
+    directUrls: Record<string, string>
+  ) => void;
+}
+
 export default function PhotoSlotUploader({ onChange }: PhotoSlotUploaderProps) {
-  const [slots, setSlots] = useState<Record<PhotoSlotKey, File | null>>({
+  const { isAr } = useLanguage();
+
+  const [slotFiles, setSlotFiles] = useState<Record<PhotoSlotKey, File | null>>({
     front_three_quarter: null,
     rear_three_quarter: null,
     side_profile: null,
@@ -33,253 +73,169 @@ export default function PhotoSlotUploader({ onChange }: PhotoSlotUploaderProps) 
     odometer: null,
   });
 
-  const [previews, setPreviews] = useState<Partial<Record<PhotoSlotKey, string>>>({});
-  const [urlSlots, setUrlSlots] = useState<Partial<Record<PhotoSlotKey, string>>>({});
-  const [extras, setExtras] = useState<File[]>([]);
+  const [slotPreviews, setSlotPreviews] = useState<Record<PhotoSlotKey, string | null>>({
+    front_three_quarter: null,
+    rear_three_quarter: null,
+    side_profile: null,
+    interior_dash: null,
+    odometer: null,
+  });
+
+  const [extraFiles, setExtraFiles] = useState<File[]>([]);
   const [extraPreviews, setExtraPreviews] = useState<string[]>([]);
-  const [compressing, setCompressing] = useState<string | null>(null);
-
-  const [editingUrlSlot, setEditingUrlSlot] = useState<PhotoSlotKey | null>(null);
-  const [urlInput, setUrlInput] = useState('');
-
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [activeCameraSlot, setActiveCameraSlot] = useState<PhotoSlotKey | null>(null);
 
-  const compress = async (file: File): Promise<File> => {
-    return await imageCompression(file, {
-      maxSizeMB: 0.4,
-      maxWidthOrHeight: 1600,
-      fileType: 'image/webp',
-      useWebWorker: true,
-    });
-  };
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const notifyChange = (
-    nextSlots: Record<PhotoSlotKey, File | null>,
-    nextExtras: File[],
-    nextUrls: Partial<Record<PhotoSlotKey, string>>
+    newSlots: Record<PhotoSlotKey, File | null>,
+    newExtras: File[]
   ) => {
-    const stringUrls: Record<string, string> = {};
-    Object.entries(nextUrls).forEach(([k, v]) => {
-      if (v) stringUrls[k] = v;
-    });
-    onChange(nextSlots, nextExtras, stringUrls);
+    onChange(newSlots, newExtras, {});
   };
 
-  const handleSlotFile = async (key: PhotoSlotKey, file: File | null) => {
-    if (!file) {
-      const nextSlots = { ...slots, [key]: null };
-      const nextPreviews = { ...previews };
-      const nextUrls = { ...urlSlots };
-      delete nextPreviews[key];
-      delete nextUrls[key];
-      setSlots(nextSlots);
-      setPreviews(nextPreviews);
-      setUrlSlots(nextUrls);
-      notifyChange(nextSlots, extras, nextUrls);
-      return;
-    }
-
-    try {
-      setCompressing(key);
-      const compressed = await compress(file);
-      const previewUrl = URL.createObjectURL(compressed);
-      const nextSlots = { ...slots, [key]: compressed };
-      const nextPreviews = { ...previews, [key]: previewUrl };
-      const nextUrls = { ...urlSlots };
-      delete nextUrls[key];
-
-      setSlots(nextSlots);
-      setPreviews(nextPreviews);
-      setUrlSlots(nextUrls);
-      notifyChange(nextSlots, extras, nextUrls);
-    } catch (err) {
-      console.error('Compression failed', err);
-    } finally {
-      setCompressing(null);
-    }
+  const handleSlotFileSelected = (slotKey: PhotoSlotKey, file: File) => {
+    const updatedFiles = { ...slotFiles, [slotKey]: file };
+    const updatedPreviews = { ...slotPreviews, [slotKey]: URL.createObjectURL(file) };
+    setSlotFiles(updatedFiles);
+    setSlotPreviews(updatedPreviews);
+    notifyChange(updatedFiles, extraFiles);
   };
 
-  const handleSaveUrl = (key: PhotoSlotKey) => {
-    const trimmed = urlInput.trim();
-    if (!trimmed || !trimmed.startsWith('http')) {
-      alert('Please enter a valid image URL starting with http/https');
-      return;
-    }
-
-    const nextSlots = { ...slots, [key]: null };
-    const nextPreviews = { ...previews, [key]: trimmed };
-    const nextUrls = { ...urlSlots, [key]: trimmed };
-
-    setSlots(nextSlots);
-    setPreviews(nextPreviews);
-    setUrlSlots(nextUrls);
-    setEditingUrlSlot(null);
-    setUrlInput('');
-    notifyChange(nextSlots, extras, nextUrls);
+  const removeSlotPhoto = (slotKey: PhotoSlotKey) => {
+    const updatedFiles = { ...slotFiles, [slotKey]: null };
+    const updatedPreviews = { ...slotPreviews, [slotKey]: null };
+    setSlotFiles(updatedFiles);
+    setSlotPreviews(updatedPreviews);
+    notifyChange(updatedFiles, extraFiles);
   };
 
-  const handleExtraAdd = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCameraCapture = (blob: Blob) => {
+    if (!activeCameraSlot) return;
+    const file = new File([blob], `${activeCameraSlot}.webp`, { type: 'image/webp' });
+    handleSlotFileSelected(activeCameraSlot, file);
+    setActiveCameraSlot(null);
+  };
+
+  const handleExtraUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || extras.length >= 5) return;
+    if (!files) return;
+    const remaining = 5 - extraFiles.length;
+    const toAdd = Array.from(files).slice(0, remaining);
+    const newPreviews = toAdd.map((f) => URL.createObjectURL(f));
 
-    const remaining = 5 - extras.length;
-    const toProcess = Array.from(files).slice(0, remaining);
-
-    setCompressing('extras');
-    try {
-      const processed: File[] = [];
-      const newUrls: string[] = [];
-
-      for (const f of toProcess) {
-        const c = await compress(f);
-        processed.push(c);
-        newUrls.push(URL.createObjectURL(c));
-      }
-
-      const nextExtras = [...extras, ...processed];
-      setExtras(nextExtras);
-      setExtraPreviews([...extraPreviews, ...newUrls]);
-      notifyChange(slots, nextExtras, urlSlots);
-    } finally {
-      setCompressing(null);
-    }
+    const updatedExtras = [...extraFiles, ...toAdd];
+    setExtraFiles(updatedExtras);
+    setExtraPreviews([...extraPreviews, ...newPreviews]);
+    notifyChange(slotFiles, updatedExtras);
   };
 
-  const removeExtra = (idx: number) => {
-    const nextExtras = extras.filter((_, i) => i !== idx);
-    const nextPreviews = extraPreviews.filter((_, i) => i !== idx);
-    setExtras(nextExtras);
-    setExtraPreviews(nextPreviews);
-    notifyChange(slots, nextExtras, urlSlots);
+  const removeExtraPhoto = (index: number) => {
+    const updatedExtras = extraFiles.filter((_, i) => i !== index);
+    const updatedPreviews = extraPreviews.filter((_, i) => i !== index);
+    setExtraFiles(updatedExtras);
+    setExtraPreviews(updatedPreviews);
+    notifyChange(slotFiles, updatedExtras);
   };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900">Standardized Photo Angles</h3>
+      <div className="text-center sm:text-start">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+          {isAr ? 'زوايا التصوير القياسية الخمس' : 'STANDARDIZED PHOTO ANGLES'}
+        </h3>
         <p className="text-xs text-slate-500 mt-0.5">
-          All 5 angles ensure every vehicle listing has a uniform layout.
+          {isAr
+            ? 'تضمن هذه الزوايا الخمس مظهراً متناسقاً واحترافياً يجذب المشترين لإعلانك.'
+            : 'All 5 angles ensure every vehicle listing has a uniform, professional layout.'}
         </p>
       </div>
 
+      {/* Standardized 5 Angles Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {REQUIRED_SLOTS.map((slot) => {
-          const isCover = slot.key === 'front_three_quarter';
-          const preview = previews[slot.key];
-          const isLoading = compressing === slot.key;
-          const isEditingUrl = editingUrlSlot === slot.key;
+        {SLOTS.map((slot) => {
+          const preview = slotPreviews[slot.key];
 
           return (
             <div
               key={slot.key}
-              className={`relative border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center min-h-[220px] transition ${
-                isCover ? 'border-[#e03a14] bg-orange-50/20' : 'border-slate-300 bg-slate-50/60'
+              className={`relative bg-slate-50 border-2 rounded-2xl p-4 flex flex-col justify-between transition min-h-[190px] ${
+                preview
+                  ? 'border-emerald-500 bg-white'
+                  : slot.isCover
+                  ? 'border-dashed border-[#e03a14] bg-orange-50/20'
+                  : 'border-dashed border-slate-200 hover:border-slate-300'
               }`}
             >
-              {isCover && (
-                <span className="absolute top-3 left-3 bg-[#e03a14] text-white text-[10px] font-bold px-2 py-0.5 rounded shadow">
-                  COVER HERO
+              {slot.isCover && !preview && (
+                <span className="absolute top-3 left-3 bg-[#e03a14] text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm">
+                  {isAr ? 'الصورة الرئيسية' : 'COVER HERO'}
                 </span>
               )}
 
-              {isLoading ? (
-                <div className="flex flex-col items-center gap-2 text-slate-500">
-                  <Loader2 className="w-6 h-6 animate-spin text-[#e03a14]" />
-                  <span className="text-xs font-semibold">Processing image...</span>
-                </div>
-              ) : isEditingUrl ? (
-                <div className="w-full space-y-2">
-                  <input
-                    type="url"
-                    placeholder="https://example.com/car.jpg"
-                    value={urlInput}
-                    onChange={(e) => setUrlInput(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-[#e03a14]"
-                  />
-                  <div className="flex gap-2">
+              {preview ? (
+                <div className="relative w-full h-full flex flex-col justify-between">
+                  <div className="relative w-full h-28 rounded-xl overflow-hidden mb-3 border border-slate-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={preview} alt={slot.titleEn} className="w-full h-full object-cover" />
                     <button
                       type="button"
-                      onClick={() => handleSaveUrl(slot.key)}
-                      className="flex-1 bg-[#e03a14] text-white py-1.5 rounded-lg text-xs font-bold"
-                    >
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingUrlSlot(null);
-                        setUrlInput('');
-                      }}
-                      className="px-3 bg-slate-200 text-slate-700 py-1.5 rounded-lg text-xs font-semibold"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : preview ? (
-                <div className="relative w-full h-full aspect-[16/9] rounded-xl overflow-hidden group">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={preview} alt={slot.label} className="w-full h-full object-cover" />
-                  <div className="absolute top-2 right-2 flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handleSlotFile(slot.key, null)}
-                      className="p-1.5 bg-black/70 hover:bg-red-600 text-white rounded-lg transition"
+                      onClick={() => removeSlotPhoto(slot.key)}
+                      className="absolute top-1.5 right-1.5 p-1 bg-black/70 text-white rounded-full hover:bg-red-600 transition"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-900 truncate">
+                      {isAr ? slot.titleAr : slot.titleEn}
+                    </span>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                  </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center text-center space-y-2">
-                  <div className="p-3 bg-white rounded-full border border-slate-200 shadow-sm">
-                    <Car className="w-6 h-6 text-slate-400" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-slate-800 block">{slot.label}</span>
-                    <span className="text-[11px] text-slate-400 block">{slot.hint}</span>
+                <div className="flex flex-col justify-between h-full space-y-3">
+                  <div className="text-center pt-3">
+                    <h4 className="text-xs font-bold text-slate-800">
+                      {isAr ? slot.titleAr : slot.titleEn}
+                    </h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {isAr ? slot.descAr : slot.descEn}
+                    </p>
                   </div>
 
-                  <div className="flex items-center gap-2 pt-2">
+                  <div className="grid grid-cols-2 gap-2 pt-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        setActiveCameraSlot(slot.key);
-                        setIsCameraOpen(true);
-                      }}
-                      className="flex items-center gap-1 bg-[#e03a14] hover:bg-[#c53210] text-white px-2.5 py-1.5 rounded-lg text-xs font-bold shadow-sm transition"
+                      onClick={() => fileInputRefs.current[slot.key]?.click()}
+                      className="bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 py-2 px-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-slate-500" />
+                      {isAr ? 'رفع ملف' : 'Upload'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveCameraSlot(slot.key)}
+                      className="bg-[#e03a14] hover:bg-[#c53210] text-white py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition"
                     >
                       <Camera className="w-3.5 h-3.5" />
-                      Take Photo
-                    </button>
-
-                    <label className="flex items-center gap-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-2.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition">
-                      Upload
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files?.[0]) {
-                            handleSlotFile(slot.key, e.target.files[0]);
-                          }
-                        }}
-                      />
-                    </label>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingUrlSlot(slot.key);
-                        setUrlInput('');
-                      }}
-                      className="p-1.5 text-slate-400 hover:text-slate-700 border border-slate-200 bg-white rounded-lg transition"
-                      title="Paste image URL"
-                    >
-                      <Link2 className="w-3.5 h-3.5" />
+                      {isAr ? 'تصوير' : 'Take Photo'}
                     </button>
                   </div>
+
+                  <input
+                    ref={(el) => {
+                      fileInputRefs.current[slot.key] = el;
+                    }}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleSlotFileSelected(slot.key, file);
+                    }}
+                  />
                 </div>
               )}
             </div>
@@ -287,11 +243,12 @@ export default function PhotoSlotUploader({ onChange }: PhotoSlotUploaderProps) 
         })}
       </div>
 
-      {/* Extra Photos Tray */}
-      <div className="pt-4 border-t border-slate-200">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-          Additional Photos (Optional, Max 5)
-        </h4>
+      {/* Additional Photos Tray */}
+      <div className="pt-4 border-t border-slate-100">
+        <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block mb-2">
+          {isAr ? 'صور إضافية للسيارة (اختياري، حتى ٥ صور)' : 'ADDITIONAL PHOTOS (OPTIONAL, MAX 5)'}
+        </label>
+        
         <div className="flex flex-wrap gap-3 items-center">
           {extraPreviews.map((url, i) => (
             <div key={i} className="relative w-24 h-20 rounded-xl overflow-hidden border border-slate-200">
@@ -299,46 +256,39 @@ export default function PhotoSlotUploader({ onChange }: PhotoSlotUploaderProps) 
               <img src={url} alt={`Extra ${i + 1}`} className="w-full h-full object-cover" />
               <button
                 type="button"
-                onClick={() => removeExtra(i)}
-                className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-full hover:bg-red-600 transition"
+                onClick={() => removeExtraPhoto(i)}
+                className="absolute top-1 right-1 p-1 bg-black/70 text-white rounded-full hover:bg-red-600 transition"
               >
                 <Trash2 className="w-3 h-3" />
               </button>
             </div>
           ))}
 
-          {extras.length < 5 && (
-            <label className="w-24 h-20 border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition">
+          {extraFiles.length < 5 && (
+            <label className="w-24 h-20 border-2 border-dashed border-slate-300 hover:border-[#e03a14] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition">
               <Plus className="w-5 h-5 text-slate-400" />
-              <span className="text-[10px] font-semibold text-slate-500 mt-0.5">Add Extra</span>
+              <span className="text-[10px] font-semibold text-slate-500 mt-1">
+                {isAr ? 'إضافة صورة' : 'Add Extra'}
+              </span>
               <input
                 type="file"
                 accept="image/*"
                 multiple
                 className="hidden"
-                disabled={compressing === 'extras'}
-                onChange={handleExtraAdd}
+                onChange={handleExtraUpload}
               />
             </label>
           )}
         </div>
       </div>
 
-      {/* Wireframe Camera Modal */}
-      {isCameraOpen && activeCameraSlot && (
+      {/* Camera Viewfinder Modal */}
+      {activeCameraSlot && (
         <CameraWireframeModal
           slotKey={activeCameraSlot}
-          isOpen={isCameraOpen}
-          onClose={() => {
-            setIsCameraOpen(false);
-            setActiveCameraSlot(null);
-          }}
-          onImageCapture={(blob) => {
-            const capturedFile = new File([blob], `${activeCameraSlot}_${Date.now()}.webp`, {
-              type: 'image/webp',
-            });
-            handleSlotFile(activeCameraSlot, capturedFile);
-          }}
+          isOpen={!!activeCameraSlot}
+          onClose={() => setActiveCameraSlot(null)}
+          onImageCapture={handleCameraCapture}
         />
       )}
     </div>
