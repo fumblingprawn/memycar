@@ -1,6 +1,16 @@
 export type Locale = 'en' | 'ar';
 
 export const DICTIONARY: Record<string, { en: string; ar: string }> = {
+  // Messaging & Chat
+  "messageSeller": { en: "Message Seller", ar: "مراسلة البائع" },
+  "messages": { en: "Messages", ar: "الرسائل" },
+  "noMessagesYet": { en: "No messages yet", ar: "لا توجد رسائل حتى الآن" },
+  "startChatPrompt": { en: "Contact sellers directly about vehicles you are interested in.", ar: "تواصل مع البائعين مباشرة للاستفسار عن السيارات المعروضة." },
+  "sendMessage": { en: "Send", ar: "إرسال" },
+  "typeMessage": { en: "Type your message...", ar: "اكتب رسالتك هنا..." },
+  "cantMessageOwnListing": { en: "This is your own listing.", ar: "هذا إعلانك الخاص، لا يمكنك مراسلة نفسك." },
+  "loginToMessage": { en: "Please log in to message the seller.", ar: "يرجى تسجيل الدخول لمراسلة البائع." },
+
   // Extended Dubizzle-Style Sort Options
   "sortDefault": { en: "Default", ar: "الافتراضي" },
   "sortNewest": { en: "Newest to Oldest", ar: "الأحدث إلى الأقدم" },

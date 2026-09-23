@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useState, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
@@ -19,15 +19,21 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
-  Lock
+  Lock,
+  MessageSquare,
+  Send
 } from 'lucide-react';
 
-export default function DashboardPage() {
+function DashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const { t, formatPrice, isAr } = useLanguage();
 
-  const [activeTab, setActiveTab] = useState<'listings' | 'saved' | 'account'>('listings');
+  const initialTab = (searchParams.get('tab') as any) || 'listings';
+  const initialConvId = searchParams.get('conv') || null;
+
+  const [activeTab, setActiveTab] = useState<'listings' | 'saved' | 'messages' | 'account'>(initialTab);
   const [user, setUser] = useState<any>(null);
   const [myListings, setMyListings] = useState<any[]>([]);
   const [savedListings, setSavedListings] = useState<any[]>([]);
@@ -40,6 +46,17 @@ export default function DashboardPage() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+
+  // Messaging State
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [selectedConv, setSelectedConv] = useState<any>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [sendingMsg, setSendingMsg] = useState(false);
+
+  // Account Deletion
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const fetchUserData = useCallback(async () => {
     setLoading(true);
@@ -56,12 +73,11 @@ export default function DashboardPage() {
     setFullName(savedName);
     setPhone(savedPhone);
 
-    // If both name and phone are already set, lock them
     if (savedName && savedPhone) {
       setIsLocked(true);
     }
 
-    // 1. Fetch user's listings
+    // 1. Fetch user listings
     const { data: listings } = await supabase
       .from('listings')
       .select('*')
@@ -70,7 +86,7 @@ export default function DashboardPage() {
 
     if (listings) setMyListings(listings);
 
-    // 2. Fetch user's saved listings
+    // 2. Fetch saved listings
     const { data: savedRows } = await supabase
       .from('saved_listings')
       .select('listing_id')
@@ -88,12 +104,98 @@ export default function DashboardPage() {
       setSavedListings([]);
     }
 
+    // 3. Fetch conversations
+    const { data: convData } = await supabase
+      .from('conversations')
+      .select(`
+        *,
+        listings:listing_id (id, make, model, year, price, image_urls)
+      `)
+      .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
+      .order('last_message_at', { ascending: false });
+
+    if (convData) {
+      setConversations(convData);
+      if (initialConvId) {
+        const found = convData.find((c: any) => c.id === initialConvId);
+        if (found) setSelectedConv(found);
+      } else if (convData.length > 0 && !selectedConv) {
+        setSelectedConv(convData[0]);
+      }
+    }
+
     setLoading(false);
-  }, [supabase, router]);
+  }, [supabase, router, initialConvId]);
 
   useEffect(() => {
     fetchUserData();
   }, [fetchUserData]);
+
+  // Load chat messages when selected conversation changes
+  useEffect(() => {
+    if (!selectedConv) return;
+
+    async function loadMessages() {
+      const { data } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', selectedConv.id)
+        .order('created_at', { ascending: true });
+
+      if (data) setMessages(data);
+    }
+
+    loadMessages();
+
+    // Subscribe to new messages
+    const channel = supabase
+      .channel(`conv_${selectedConv.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${selectedConv.id}` },
+        (payload) => {
+          setMessages((prev) => [...prev, payload.new]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedConv, supabase]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !selectedConv || !user) return;
+
+    setSendingMsg(true);
+    const text = newMessage.trim();
+    setNewMessage('');
+
+    try {
+      const { error: msgErr } = await supabase.from('messages').insert({
+        conversation_id: selectedConv.id,
+        sender_id: user.id,
+        content: text,
+      });
+
+      if (msgErr) throw msgErr;
+
+      // Update conversation last message timestamp
+      await supabase
+        .from('conversations')
+        .update({
+          last_message: text,
+          last_message_at: new Date().toISOString(),
+        })
+        .eq('id', selectedConv.id);
+
+    } catch (err) {
+      console.error('Failed to send message:', err);
+    } finally {
+      setSendingMsg(false);
+    }
+  };
 
   const handleSaveAndLock = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,7 +205,6 @@ export default function DashboardPage() {
     setProfileSuccess(false);
     setProfileError(null);
 
-    // Validate UAE phone number pattern: +971 5X XXX XXXX or 05X XXX XXXX
     const cleanPhone = phone.replace(/[\s-]/g, '');
     const uaePhoneRegex = /^(?:\+971|00971|0)?5[024568]\d{7}$/;
 
@@ -162,36 +263,32 @@ export default function DashboardPage() {
     }
   };
 
-  
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deletingAccount, setDeletingAccount] = useState(false);
-
   const handleDeleteAccount = async () => {
     setDeletingAccount(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const res = await fetch("/api/account/delete", {
-        method: "POST",
+      const res = await fetch('/api/account/delete', {
+        method: 'POST',
         headers: {
-          "Authorization": "Bearer " + session.access_token,
-          "Content-Type": "application/json"
-        }
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
       });
 
-      if (!res.ok) throw new Error("Deletion failed");
+      if (!res.ok) throw new Error('Deletion failed');
 
       await supabase.auth.signOut();
-      alert(t("accountDeletedNotice"));
-      router.push("/");
+      alert(t('accountDeletedNotice'));
+      router.push('/');
       router.refresh();
     } catch (e: any) {
-      alert(e.message || "Failed to delete account");
+      alert(e.message || 'Failed to delete account');
       setDeletingAccount(false);
     }
   };
-  
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.push('/');
@@ -209,8 +306,8 @@ export default function DashboardPage() {
   return (
     <div className="min-h-[85vh] bg-[#f8f9fa] py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* User Top Card */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        {/* User Card */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-lg">
               {(fullName || user?.email)?.charAt(0).toUpperCase()}
@@ -237,7 +334,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <Link
               href="/sell"
-              className="flex-1 sm:flex-none justify-center bg-[#e03a14] hover:bg-[#c53210] text-white text-xs font-bold py-2.5 px-4 rounded-xl flex items-center gap-1.5 transition shadow-sm"
+              className="flex-1 sm:flex-none justify-center bg-[#e03a14] hover:bg-[#c53210] text-white text-xs font-bold py-2.5 px-4 rounded-xl flex items-center gap-1.5 transition shadow-2xs"
             >
               <PlusCircle className="w-4 h-4" />
               {t('sellCar')}
@@ -253,10 +350,10 @@ export default function DashboardPage() {
         </div>
 
         {/* Tab Controls */}
-        <div className="flex gap-2 border-b border-slate-200 mb-6 pb-2">
+        <div className="flex gap-2 border-b border-slate-200 mb-6 pb-2 overflow-x-auto">
           <button
             onClick={() => setActiveTab('listings')}
-            className={`flex items-center gap-2 py-2 px-4 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-2 py-2 px-4 rounded-xl text-xs font-bold transition whitespace-nowrap ${
               activeTab === 'listings'
                 ? 'bg-slate-900 text-white'
                 : 'text-slate-600 hover:bg-slate-200/60'
@@ -268,7 +365,7 @@ export default function DashboardPage() {
 
           <button
             onClick={() => setActiveTab('saved')}
-            className={`flex items-center gap-2 py-2 px-4 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-2 py-2 px-4 rounded-xl text-xs font-bold transition whitespace-nowrap ${
               activeTab === 'saved'
                 ? 'bg-slate-900 text-white'
                 : 'text-slate-600 hover:bg-slate-200/60'
@@ -279,8 +376,20 @@ export default function DashboardPage() {
           </button>
 
           <button
+            onClick={() => setActiveTab('messages')}
+            className={`flex items-center gap-2 py-2 px-4 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+              activeTab === 'messages'
+                ? 'bg-slate-900 text-white'
+                : 'text-slate-600 hover:bg-slate-200/60'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4 text-[#e03a14]" />
+            {t('messages')} ({conversations.length})
+          </button>
+
+          <button
             onClick={() => setActiveTab('account')}
-            className={`flex items-center gap-2 py-2 px-4 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-2 py-2 px-4 rounded-xl text-xs font-bold transition whitespace-nowrap ${
               activeTab === 'account'
                 ? 'bg-slate-900 text-white'
                 : 'text-slate-600 hover:bg-slate-200/60'
@@ -291,7 +400,7 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* TAB 1: MY CARS FOR SALE */}
+        {/* TAB 1: MY CARS */}
         {activeTab === 'listings' && (
           <div>
             {myListings.length === 0 ? (
@@ -311,7 +420,7 @@ export default function DashboardPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {myListings.map((car) => (
-                  <div key={car.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm flex flex-col justify-between">
+                  <div key={car.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs flex flex-col justify-between">
                     <div>
                       <div className="relative aspect-[16/10] bg-slate-900">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -320,7 +429,7 @@ export default function DashboardPage() {
                           alt={car.model}
                           className="w-full h-full object-cover"
                         />
-                        <span className="absolute top-2.5 left-2.5 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow">
+                        <span className="absolute top-2.5 left-2.5 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-2xs">
                           {isAr ? 'إعلان نشط' : 'Active'}
                         </span>
                       </div>
@@ -384,9 +493,137 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* TAB 3: ACCOUNT & CONTACT SETTINGS (LOCKED / UNLOCKED) */}
+        {/* TAB 3: INTERNAL MESSAGES INBOX */}
+        {activeTab === 'messages' && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden grid grid-cols-1 md:grid-cols-3 min-h-[500px]">
+            {/* Conversation List */}
+            <div className="border-r border-slate-200 bg-slate-50/50 flex flex-col">
+              <div className="p-4 border-b border-slate-200 font-black text-xs uppercase tracking-wider text-slate-500">
+                {t('messages')}
+              </div>
+              <div className="overflow-y-auto flex-1 divide-y divide-slate-100">
+                {conversations.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-400">
+                    <MessageSquare className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                    {t('noMessagesYet')}
+                  </div>
+                ) : (
+                  conversations.map((conv) => {
+                    const car = conv.listings;
+                    const isSelected = selectedConv?.id === conv.id;
+                    return (
+                      <button
+                        key={conv.id}
+                        type="button"
+                        onClick={() => setSelectedConv(conv)}
+                        className={`w-full p-4 text-left flex items-start gap-3 transition ${
+                          isSelected ? 'bg-white border-l-4 border-[#e03a14] shadow-2xs' : 'hover:bg-slate-100/60'
+                        }`}
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-slate-900 overflow-hidden flex-shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={car?.image_urls?.[0] || '/placeholder-car.jpg'}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs font-bold text-slate-900 truncate">
+                            {car ? `${car.year} ${car.make} ${car.model}` : 'Vehicle Inquiry'}
+                          </h4>
+                          <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                            {conv.last_message || t('noMessagesYet')}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Chat Content Panel */}
+            <div className="md:col-span-2 flex flex-col justify-between bg-white h-[500px]">
+              {selectedConv ? (
+                <>
+                  {/* Top Bar for Active Chat */}
+                  <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                    <div>
+                      <h4 className="text-xs font-black text-slate-900">
+                        {selectedConv.listings?.year} {selectedConv.listings?.make} {selectedConv.listings?.model}
+                      </h4>
+                      <span className="text-[11px] font-bold text-[#e03a14]">
+                        {formatPrice(selectedConv.listings?.price || 0)}
+                      </span>
+                    </div>
+                    {selectedConv.listings?.id && (
+                      <Link
+                        href={`/listing/${selectedConv.listings.id}`}
+                        className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1 font-semibold"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        {isAr ? 'عرض السيارة' : 'View Listing'}
+                      </Link>
+                    )}
+                  </div>
+
+                  {/* Message History */}
+                  <div className="p-4 overflow-y-auto flex-1 space-y-3">
+                    {messages.map((m) => {
+                      const isMe = m.sender_id === user?.id;
+                      return (
+                        <div
+                          key={m.id}
+                          className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-[75%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed ${
+                              isMe
+                                ? 'bg-[#e03a14] text-white rounded-br-xs'
+                                : 'bg-slate-100 text-slate-800 rounded-bl-xs'
+                            }`}
+                          >
+                            <p>{m.content}</p>
+                            <span className={`text-[9px] mt-1 block opacity-70 ${isMe ? 'text-right' : 'text-left'}`}>
+                              {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Send Form */}
+                  <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-100 flex gap-2">
+                    <input
+                      type="text"
+                      placeholder={t('typeMessage')}
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      className="flex-1 px-4 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14]"
+                    />
+                    <button
+                      type="submit"
+                      disabled={sendingMsg || !newMessage.trim()}
+                      className="bg-[#e03a14] hover:bg-[#c53210] disabled:bg-slate-300 text-white p-2.5 rounded-xl transition"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-xs text-slate-400 p-8 text-center">
+                  {t('startChatPrompt')}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: ACCOUNT SETTINGS */}
         {activeTab === 'account' && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-lg shadow-sm space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-lg shadow-2xs space-y-6">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
@@ -426,7 +663,6 @@ export default function DashboardPage() {
             )}
 
             <form onSubmit={handleSaveAndLock} className="space-y-4">
-              {/* Email (Always Disabled) */}
               <div>
                 <label className="text-xs font-semibold text-slate-500 block mb-1">
                   {t('email')}
@@ -439,7 +675,6 @@ export default function DashboardPage() {
                 />
               </div>
 
-              {/* Full Name / Dealer Name */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-semibold text-slate-700">
@@ -467,7 +702,6 @@ export default function DashboardPage() {
                 />
               </div>
 
-              {/* UAE Phone Number */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-semibold text-slate-700">
@@ -499,7 +733,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Action Button: Locked vs Save */}
               {isLocked ? (
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-500 leading-relaxed">
                   <span className="font-semibold text-slate-700 block mb-0.5">
@@ -516,59 +749,57 @@ export default function DashboardPage() {
                 <button
                   type="submit"
                   disabled={profileSaving}
-                  className="bg-[#e03a14] hover:bg-[#c53210] disabled:bg-slate-300 text-white text-xs font-bold py-2.5 px-5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
+                  className="bg-[#e03a14] hover:bg-[#c53210] disabled:bg-slate-300 text-white text-xs font-bold py-2.5 px-5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-2xs"
                 >
                   {profileSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   {isAr ? 'حفظ وتثبيت البيانات' : 'Save & Lock Details'}
                 </button>
               )}
-            </form>
 
-            {/* Danger Zone: Delete Account */}
-            <div className="pt-6 border-t border-red-100">
-              <h4 className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">
-                {t("deleteAccount")}
-              </h4>
-              <p className="text-[11px] text-slate-500 mb-3">
-                {t("deleteAccountConfirm")}
-              </p>
-              <button
-                type="button"
-                onClick={() => setDeleteModalOpen(true)}
-                className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 px-3.5 rounded-xl transition shadow-2xs"
-              >
-                {t("deleteAccountBtn")}
-              </button>
-            </div>
+              {/* Danger Zone: Delete Account */}
+              <div className="pt-6 border-t border-red-100">
+                <h4 className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">
+                  {t('deleteAccount')}
+                </h4>
+                <p className="text-[11px] text-slate-500 mb-3">
+                  {t('deleteAccountConfirm')}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setDeleteModalOpen(true)}
+                  className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 px-3.5 rounded-xl transition shadow-2xs"
+                >
+                  {t('deleteAccountBtn')}
+                </button>
+              </div>
 
-            {/* Confirm Modal */}
-            {deleteModalOpen && (
-              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-sm w-full shadow-2xl">
-                  <h3 className="text-sm font-black text-slate-900 mb-2">{t("deleteAccount")}</h3>
-                  <p className="text-xs text-slate-600 mb-5 leading-relaxed">{t("deleteAccountConfirm")}</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      disabled={deletingAccount}
-                      onClick={() => setDeleteModalOpen(false)}
-                      className="py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600"
-                    >
-                      {t("cancel")}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={deletingAccount}
-                      onClick={handleDeleteAccount}
-                      className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white py-2 rounded-xl text-xs font-bold"
-                    >
-                      {deletingAccount ? "Deleting..." : t("deleteAccountBtn")}
-                    </button>
+              {deleteModalOpen && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-sm w-full shadow-2xl">
+                    <h3 className="text-sm font-black text-slate-900 mb-2">{t('deleteAccount')}</h3>
+                    <p className="text-xs text-slate-600 mb-5 leading-relaxed">{t('deleteAccountConfirm')}</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        disabled={deletingAccount}
+                        onClick={() => setDeleteModalOpen(false)}
+                        className="py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600"
+                      >
+                        {t('cancel')}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={deletingAccount}
+                        onClick={handleDeleteAccount}
+                        className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white py-2 rounded-xl text-xs font-bold"
+                      >
+                        {deletingAccount ? 'Deleting...' : t('deleteAccountBtn')}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-  
+              )}
+            </form>
 
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
               <div>
@@ -586,5 +817,13 @@ export default function DashboardPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#f8f9fa]" />}>
+      <DashboardContent />
+    </Suspense>
   );
 }

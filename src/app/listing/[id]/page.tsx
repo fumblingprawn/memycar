@@ -22,7 +22,9 @@ import {
   Bookmark, 
   Phone,
   Eye,
-  Clock
+  Clock,
+  MessageSquare,
+  Loader2
 } from 'lucide-react';
 
 export default function ListingDetailPage() {
@@ -32,12 +34,15 @@ export default function ListingDetailPage() {
   const { t, formatPrice, formatMileage, isAr, locale } = useLanguage();
 
   const [listing, setListing] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [chatStarting, setChatStarting] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
 
   // Description translation
   const [isTranslating, setIsTranslating] = useState(false);
@@ -50,6 +55,7 @@ export default function ListingDetailPage() {
     if (!listingId) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    setCurrentUser(user);
 
     const { data } = await supabase
       .from('saved_listings')
@@ -74,7 +80,7 @@ export default function ListingDetailPage() {
         if (error) throw error;
         setListing(data);
 
-        // Increment view count in Supabase
+        // Increment view count
         supabase.rpc('increment_listing_view', { target_listing_id: listingId }).then(() => {});
       } catch (err) {
         console.error('Failed to load listing:', err);
@@ -114,6 +120,71 @@ export default function ListingDetailPage() {
       setSaved(!saved);
     } finally {
       setSaveLoading(false);
+    }
+  };
+
+  const handleStartChat = async () => {
+    setChatError(null);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      router.push('/auth');
+      return;
+    }
+
+    if (listing?.user_id && listing.user_id === user.id) {
+      setChatError(t('cantMessageOwnListing'));
+      return;
+    }
+
+    setChatStarting(true);
+    try {
+      // Find or create conversation
+      const sellerId = listing.user_id;
+      if (!sellerId) {
+        setChatError(isAr ? 'بيانات البائع غير متوفرة للمراسلة' : 'Seller is not available for internal messaging');
+        setChatStarting(false);
+        return;
+      }
+
+      // Check existing conversation
+      const { data: existing } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('listing_id', listingId)
+        .eq('buyer_id', user.id)
+        .maybeSingle();
+
+      let conversationId = existing?.id;
+
+      if (!conversationId) {
+        const { data: created, error: createErr } = await supabase
+          .from('conversations')
+          .insert({
+            listing_id: listingId,
+            buyer_id: user.id,
+            seller_id: sellerId,
+            last_message: isAr ? 'مرحبا، هل هذه السيارة ما زالت متوفرة؟' : 'Hi, is this vehicle still available?',
+          })
+          .select()
+          .single();
+
+        if (createErr) throw createErr;
+        conversationId = created.id;
+
+        // Insert initial greeting message
+        await supabase.from('messages').insert({
+          conversation_id: conversationId,
+          sender_id: user.id,
+          content: isAr ? 'مرحبا، هل هذه السيارة ما زالت متوفرة؟' : 'Hi, is this vehicle still available?',
+        });
+      }
+
+      router.push(`/dashboard?tab=messages&conv=${conversationId}`);
+    } catch (err: any) {
+      console.error('Chat error:', err);
+      setChatError(err.message || 'Could not open conversation');
+    } finally {
+      setChatStarting(false);
     }
   };
 
@@ -317,7 +388,7 @@ export default function ListingDetailPage() {
 
           {/* Sticky Box */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm sticky top-24 space-y-5">
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm sticky top-24 space-y-4">
               <div>
                 <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
                   {listing.year} {isAr ? t(listing.make) : listing.make} {isAr ? t(listing.model) : listing.model}
@@ -356,7 +427,7 @@ export default function ListingDetailPage() {
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-100">
+              <div className="pt-2 border-t border-slate-100">
                 <div className="flex items-center justify-between">
                   <Link
                     href={`/search?seller=${encodeURIComponent(sellerName)}`}
@@ -369,20 +440,43 @@ export default function ListingDetailPage() {
                 <p className="text-xs text-slate-500 mt-0.5">{t(city)}, UAE</p>
               </div>
 
+              {/* Action 1: Call Button */}
               {phone ? (
                 <a
                   href={`tel:${phone}`}
-                  className="w-full bg-[#e03a14] hover:bg-[#c53210] text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow transition"
+                  className="w-full bg-[#e03a14] hover:bg-[#c53210] text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow transition text-sm"
                 >
                   <Phone className="w-4 h-4" />
                   {t('call')} {phone}
                 </a>
               ) : (
-                <button disabled className="w-full bg-slate-200 text-slate-400 py-3.5 px-4 rounded-xl font-bold text-sm">
+                <button disabled className="w-full bg-slate-200 text-slate-400 py-3 px-4 rounded-xl font-bold text-sm">
                   {t('phoneNotAvailable')}
                 </button>
               )}
 
+              {/* Action 2: Internal Message Seller Button */}
+              <button
+                type="button"
+                disabled={chatStarting}
+                onClick={handleStartChat}
+                className="w-full bg-slate-900 hover:bg-black text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition text-sm"
+              >
+                {chatStarting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <MessageSquare className="w-4 h-4 text-[#e03a14]" />
+                )}
+                {t('messageSeller')}
+              </button>
+
+              {chatError && (
+                <p className="text-[11px] text-red-600 text-center font-medium bg-red-50 p-2 rounded-lg">
+                  {chatError}
+                </p>
+              )}
+
+              {/* Save & Share */}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <button
                   type="button"
