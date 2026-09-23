@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { X, Camera, CameraOff, Loader2, RefreshCw } from 'lucide-react';
 import { PhotoSlotKey } from '@/types/listing';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface CameraWireframeModalProps {
   slotKey: PhotoSlotKey;
@@ -17,6 +18,7 @@ export default function CameraWireframeModal({
   onClose,
   onImageCapture,
 }: CameraWireframeModalProps) {
+  const { t, isAr } = useLanguage();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -26,6 +28,14 @@ export default function CameraWireframeModal({
   const [isInitializing, setIsInitializing] = useState(true);
   const [videoReady, setVideoReady] = useState(false);
   const [capturing, setCapturing] = useState(false);
+
+  const slotLabelsAr: Record<PhotoSlotKey, string> = {
+    front_three_quarter: 'زاوية أمامية ٣/٤',
+    rear_three_quarter: 'زاوية خلفية ٣/٤',
+    side_profile: 'مظهر جانبي كامل',
+    interior_dash: 'مقصورة السائق والعدادات',
+    odometer: 'عداد المسافة',
+  };
 
   const stopTracks = useCallback(() => {
     if (streamRef.current) {
@@ -45,27 +55,24 @@ export default function CameraWireframeModal({
     setVideoReady(false);
 
     if (!navigator?.mediaDevices?.getUserMedia) {
-      setError('Live camera viewfinder is not supported on this browser. Use standard device camera.');
+      setError('Live camera viewfinder is not supported on this browser.');
       setIsInitializing(false);
       return;
     }
 
     let mediaStream: MediaStream | null = null;
-
     try {
       mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' } },
         audio: false,
       });
     } catch (e1) {
-      console.warn('Rear camera unavailable, trying fallback camera:', e1);
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: false,
         });
       } catch (e2: any) {
-        console.error('All camera attempts failed:', e2);
         setError(e2?.message || 'Camera permission denied or camera in use.');
         setIsInitializing(false);
         return;
@@ -82,7 +89,7 @@ export default function CameraWireframeModal({
             setVideoReady(true);
           }
         } catch (playErr) {
-          console.warn('Video play interrupted:', playErr);
+          console.warn('Play error:', playErr);
         } finally {
           setIsInitializing(false);
         }
@@ -145,54 +152,28 @@ export default function CameraWireframeModal({
 
   if (!isOpen) return null;
 
-  // Clear, distinct car silhouette wireframes
   const renderSilhouette = () => {
     switch (slotKey) {
       case 'front_three_quarter':
         return (
           <svg className="w-full h-full max-h-[75vh] drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]" viewBox="0 0 800 500" fill="none">
-            {/* Ground Baseline */}
             <line x1="80" y1="410" x2="740" y2="410" stroke="#f97316" strokeWidth="2.5" strokeDasharray="8 6" opacity="0.8" />
-            
-            {/* Main Outer Body Contour */}
             <path stroke="#ffffff" strokeWidth="3.5" strokeDasharray="9 5" d="
-              M 115,350 
-              C 125,325 155,305 190,305 
-              C 225,305 255,325 265,355 
-              L 545,355 
-              C 555,320 595,295 640,295 
-              C 685,295 720,320 730,360 
-              L 755,350 
-              C 775,320 770,270 715,245 
-              L 580,225 
-              L 475,130 
-              C 450,115 360,115 300,130 
-              L 190,225 
-              C 130,235 90,265 85,305 
-              C 80,340 95,350 115,350 Z
+              M 115,350 C 125,325 155,305 190,305 C 225,305 255,325 265,355 L 545,355 
+              C 555,320 595,295 640,295 C 685,295 720,320 730,360 L 755,350 
+              C 775,320 770,270 715,245 L 580,225 L 475,130 C 450,115 360,115 300,130 
+              L 190,225 C 130,235 90,265 85,305 C 80,340 95,350 115,350 Z
             " />
-
-            {/* Front & Rear Tire Markers with Center Hubs */}
             <circle cx="190" cy="360" r="52" stroke="#ffffff" strokeWidth="3.5" />
             <circle cx="190" cy="360" r="16" stroke="#f97316" strokeWidth="2.5" strokeDasharray="4 3" />
             <circle cx="640" cy="345" r="46" stroke="#ffffff" strokeWidth="3.5" />
             <circle cx="640" cy="345" r="14" stroke="#f97316" strokeWidth="2.5" strokeDasharray="4 3" />
-
-            {/* Greenhouse (Windshield & Roofline) */}
             <path stroke="#38bdf8" strokeWidth="2.5" strokeDasharray="6 4" d="M 300,130 L 475,130 L 450,225 L 220,225 Z" />
-            <line x1="325" y1="130" x2="310" y2="225" stroke="#38bdf8" strokeWidth="2" strokeDasharray="4 4" />
-
-            {/* Headlight & Driver Side Hood Ridge */}
-            <path stroke="#facc15" strokeWidth="2.5" strokeDasharray="5 4" d="M 110,290 C 145,282 185,278 230,270" />
             <ellipse cx="140" cy="285" rx="14" ry="7" stroke="#facc15" strokeWidth="2" />
-
-            {/* Side Mirror */}
             <ellipse cx="280" cy="215" rx="16" ry="10" stroke="#ffffff" strokeWidth="2.5" />
-
-            {/* Directional HUD Badge */}
-            <rect x="230" y="30" width="340" height="34" rx="17" fill="rgba(0,0,0,0.6)" stroke="#f97316" strokeWidth="1.5" />
-            <text x="400" y="52" fill="#ffffff" textAnchor="middle" fontSize="14" fontWeight="bold" letterSpacing="1">
-              ALIGN FRONT 3/4 (DRIVER SIDE + NOSE)
+            <rect x="180" y="30" width="440" height="36" rx="18" fill="rgba(0,0,0,0.65)" stroke="#f97316" strokeWidth="1.5" />
+            <text x="400" y="53" fill="#ffffff" textAnchor="middle" fontSize="14" fontWeight="bold" letterSpacing="0.5">
+              {t('alignFront34')}
             </text>
           </svg>
         );
@@ -200,48 +181,23 @@ export default function CameraWireframeModal({
       case 'rear_three_quarter':
         return (
           <svg className="w-full h-full max-h-[75vh] drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]" viewBox="0 0 800 500" fill="none">
-            {/* Ground Baseline */}
             <line x1="60" y1="410" x2="720" y2="410" stroke="#f97316" strokeWidth="2.5" strokeDasharray="8 6" opacity="0.8" />
-
-            {/* Main Outer Body Contour */}
             <path stroke="#ffffff" strokeWidth="3.5" strokeDasharray="9 5" d="
-              M 685,350 
-              C 675,325 645,305 610,305 
-              C 575,305 545,325 535,355 
-              L 255,355 
-              C 245,320 205,295 160,295 
-              C 115,295 80,320 70,360 
-              L 45,350 
-              C 25,320 30,270 85,245 
-              L 220,225 
-              L 325,130 
-              C 350,115 440,115 500,130 
-              L 610,225 
-              C 670,235 710,265 715,305 
-              C 720,340 705,350 685,350 Z
+              M 685,350 C 675,325 645,305 610,305 C 575,305 545,325 535,355 L 255,355 
+              C 245,320 205,295 160,295 C 115,295 80,320 70,360 L 45,350 
+              C 25,320 30,270 85,245 L 220,225 L 325,130 C 350,115 440,115 500,130 
+              L 610,225 C 670,235 710,265 715,305 C 720,340 705,350 685,350 Z
             " />
-
-            {/* Rear & Front Tire Markers */}
             <circle cx="610" cy="360" r="52" stroke="#ffffff" strokeWidth="3.5" />
             <circle cx="610" cy="360" r="16" stroke="#f97316" strokeWidth="2.5" strokeDasharray="4 3" />
             <circle cx="160" cy="345" r="46" stroke="#ffffff" strokeWidth="3.5" />
             <circle cx="160" cy="345" r="14" stroke="#f97316" strokeWidth="2.5" strokeDasharray="4 3" />
-
-            {/* Rear Windshield & Roof Pillar */}
             <path stroke="#38bdf8" strokeWidth="2.5" strokeDasharray="6 4" d="M 500,130 L 325,130 L 350,225 L 580,225 Z" />
-            <line x1="475" y1="130" x2="490" y2="225" stroke="#38bdf8" strokeWidth="2" strokeDasharray="4 4" />
-
-            {/* Taillights & Trunk Ridge */}
-            <path stroke="#ef4444" strokeWidth="3" strokeDasharray="5 4" d="M 690,290 C 655,282 615,278 570,270" />
             <ellipse cx="660" cy="285" rx="14" ry="7" stroke="#ef4444" strokeWidth="2" fill="rgba(239,68,68,0.3)" />
-
-            {/* Passenger Side Mirror */}
             <ellipse cx="520" cy="215" rx="16" ry="10" stroke="#ffffff" strokeWidth="2.5" />
-
-            {/* Directional HUD Badge */}
-            <rect x="230" y="30" width="340" height="34" rx="17" fill="rgba(0,0,0,0.6)" stroke="#f97316" strokeWidth="1.5" />
-            <text x="400" y="52" fill="#ffffff" textAnchor="middle" fontSize="14" fontWeight="bold" letterSpacing="1">
-              ALIGN REAR 3/4 (TAILLIGHTS + TRUNK)
+            <rect x="180" y="30" width="440" height="36" rx="18" fill="rgba(0,0,0,0.65)" stroke="#f97316" strokeWidth="1.5" />
+            <text x="400" y="53" fill="#ffffff" textAnchor="middle" fontSize="14" fontWeight="bold" letterSpacing="0.5">
+              {t('alignRear34')}
             </text>
           </svg>
         );
@@ -251,26 +207,17 @@ export default function CameraWireframeModal({
           <svg className="w-full h-full max-h-[75vh] drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]" viewBox="0 0 800 500" fill="none">
             <line x1="40" y1="410" x2="760" y2="410" stroke="#f97316" strokeWidth="2.5" strokeDasharray="8 6" opacity="0.8" />
             <path stroke="#ffffff" strokeWidth="3.5" strokeDasharray="9 5" d="
-              M 60,360 L 120,360 
-              C 130,305 180,275 240,275 
-              C 300,275 350,305 360,360 
-              L 540,360 
-              C 550,305 600,275 660,275 
-              C 720,275 770,305 780,360 
-              L 790,360 
-              C 795,310 770,250 720,230 
-              L 560,210 L 460,110 
-              C 430,95 320,95 260,115 
-              L 160,210 L 70,240 
-              C 40,265 40,320 60,360 Z
+              M 60,360 L 120,360 C 130,305 180,275 240,275 C 300,275 350,305 360,360 
+              L 540,360 C 550,305 600,275 660,275 C 720,275 770,305 780,360 
+              L 790,360 C 795,310 770,250 720,230 L 560,210 L 460,110 
+              C 430,95 320,95 260,115 L 160,210 L 70,240 C 40,265 40,320 60,360 Z
             " />
             <circle cx="240" cy="355" r="55" stroke="#ffffff" strokeWidth="3.5" />
             <circle cx="660" cy="355" r="55" stroke="#ffffff" strokeWidth="3.5" />
             <path stroke="#38bdf8" strokeWidth="2.5" strokeDasharray="5 5" d="M 270,125 L 440,125 L 530,205 L 185,205 Z" />
-            <line x1="365" y1="125" x2="365" y2="205" stroke="#38bdf8" strokeWidth="2" strokeDasharray="4 4" />
-            <rect x="240" y="30" width="320" height="34" rx="17" fill="rgba(0,0,0,0.6)" stroke="#f97316" strokeWidth="1.5" />
-            <text x="400" y="52" fill="#ffffff" textAnchor="middle" fontSize="14" fontWeight="bold" letterSpacing="1">
-              ALIGN FULL SIDE PROFILE (LEVEL)
+            <rect x="180" y="30" width="440" height="36" rx="18" fill="rgba(0,0,0,0.65)" stroke="#f97316" strokeWidth="1.5" />
+            <text x="400" y="53" fill="#ffffff" textAnchor="middle" fontSize="14" fontWeight="bold" letterSpacing="0.5">
+              {t('alignSide')}
             </text>
           </svg>
         );
@@ -281,9 +228,9 @@ export default function CameraWireframeModal({
             <ellipse cx="260" cy="300" rx="105" ry="120" stroke="#ffffff" strokeWidth="3.5" strokeDasharray="8 6" />
             <circle cx="260" cy="300" r="35" stroke="#ffffff" strokeWidth="2" strokeDasharray="4 4" />
             <rect x="420" y="210" width="220" height="150" rx="14" stroke="#38bdf8" strokeWidth="3" strokeDasharray="6 4" />
-            <rect x="230" y="30" width="340" height="34" rx="17" fill="rgba(0,0,0,0.6)" stroke="#f97316" strokeWidth="1.5" />
-            <text x="400" y="52" fill="#ffffff" textAnchor="middle" fontSize="14" fontWeight="bold" letterSpacing="1">
-              FRAME COCKPIT (STEERING + CONSOLE)
+            <rect x="180" y="30" width="440" height="36" rx="18" fill="rgba(0,0,0,0.65)" stroke="#f97316" strokeWidth="1.5" />
+            <text x="400" y="53" fill="#ffffff" textAnchor="middle" fontSize="14" fontWeight="bold" letterSpacing="0.5">
+              {t('alignDash')}
             </text>
           </svg>
         );
@@ -296,9 +243,9 @@ export default function CameraWireframeModal({
             <circle cx="280" cy="260" r="65" stroke="#ffffff" strokeWidth="2" strokeDasharray="4 4" />
             <circle cx="520" cy="260" r="65" stroke="#ffffff" strokeWidth="2" strokeDasharray="4 4" />
             <rect x="360" y="270" width="80" height="40" rx="6" stroke="#f97316" strokeWidth="2" strokeDasharray="3 3" />
-            <rect x="230" y="30" width="340" height="34" rx="17" fill="rgba(0,0,0,0.6)" stroke="#f97316" strokeWidth="1.5" />
-            <text x="400" y="52" fill="#ffffff" textAnchor="middle" fontSize="14" fontWeight="bold" letterSpacing="1">
-              FOCUS ODOMETER / DIGITAL CLUSTER
+            <rect x="180" y="30" width="440" height="36" rx="18" fill="rgba(0,0,0,0.65)" stroke="#f97316" strokeWidth="1.5" />
+            <text x="400" y="53" fill="#ffffff" textAnchor="middle" fontSize="14" fontWeight="bold" letterSpacing="0.5">
+              {t('alignOdo')}
             </text>
           </svg>
         );
@@ -310,7 +257,7 @@ export default function CameraWireframeModal({
       {/* Header */}
       <div className="flex items-center justify-between p-4 z-30 bg-gradient-to-b from-black/90 to-transparent">
         <span className="text-white text-xs font-bold uppercase tracking-wider bg-white/10 px-3 py-1.5 rounded-full border border-white/20">
-          {slotKey.replace(/_/g, ' ')}
+          {isAr ? slotLabelsAr[slotKey] : slotKey.replace(/_/g, ' ')}
         </span>
         <button
           type="button"
@@ -339,14 +286,14 @@ export default function CameraWireframeModal({
         {isInitializing && (
           <div className="flex flex-col items-center gap-3 text-white z-20">
             <Loader2 className="w-8 h-8 animate-spin text-[#e03a14]" />
-            <span className="text-xs font-medium">Opening camera...</span>
+            <span className="text-xs font-medium">{t('openingCamera')}</span>
           </div>
         )}
 
         {error && (
           <div className="text-center p-6 bg-slate-900 border border-slate-700 rounded-3xl max-w-sm mx-4 text-slate-200 shadow-2xl z-30">
             <CameraOff className="w-10 h-10 mx-auto mb-3 text-amber-400" />
-            <h3 className="text-sm font-bold text-white mb-1">Camera Stream Blocked</h3>
+            <h3 className="text-sm font-bold text-white mb-1">{t('cameraBlocked')}</h3>
             <p className="text-xs text-slate-400 mb-5 leading-relaxed">{error}</p>
             
             <div className="flex flex-col gap-2">
@@ -355,14 +302,14 @@ export default function CameraWireframeModal({
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full bg-[#e03a14] hover:bg-[#c53210] text-white py-3 rounded-xl font-bold text-xs shadow-md transition"
               >
-                Take Photo with Native Camera
+                {t('takePhotoNative')}
               </button>
               <button
                 type="button"
                 onClick={startStream}
                 className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition"
               >
-                <RefreshCw className="w-3.5 h-3.5" /> Retry Permission
+                <RefreshCw className="w-3.5 h-3.5" /> {t('retryPermission')}
               </button>
             </div>
             

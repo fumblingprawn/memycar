@@ -7,7 +7,7 @@ import { carData, years } from '@/lib/constants/car-data';
 import PhotoSlotUploader from '@/components/sell/PhotoSlotUploader';
 import { PhotoSlotKey } from '@/types/listing';
 import { useLanguage } from '@/context/LanguageContext';
-import { CheckCircle2, ChevronRight, Car, Camera, FileText, User } from 'lucide-react';
+import { CheckCircle2, ChevronRight, Car, Camera, FileText, User, Trash2, UploadCloud } from 'lucide-react';
 
 export default function SellPage() {
   const router = useRouter();
@@ -18,25 +18,26 @@ export default function SellPage() {
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Form State: Initialized with empty strings for clean default select placeholders
   const [formData, setFormData] = useState({
     make: '',
+    custom_make: '',
     model: '',
+    custom_model: '',
     year: '',
     trim: '',
-    previous_owners: '',
+    transmission: '',
     specs: '',
-    body_type: '',
-    horsepower: '',
-    cylinders: '',
-    accident_history: '',
-    warranty: '',
-    exterior_color: '',
     mileage: '',
     price: '',
     city: '',
-    transmission: '',
-    fuel_type: '',
+    accident_history: '',
+    warranty: '',
+    body_type: '',
+    horsepower: '',
+    cylinders: '',
+    exterior_color: '',
+    previous_owners: '',
+    fuel_type: 'Petrol',
     description: '',
     last_service_date: '',
     service_notes: '',
@@ -54,16 +55,18 @@ export default function SellPage() {
   const [extraPhotos, setExtraPhotos] = useState<File[]>([]);
   const [directUrls, setDirectUrls] = useState<Record<string, string>>({});
 
+  const [serviceDocs, setServiceDocs] = useState<File[]>([]);
+  const [serviceDocPreviews, setServiceDocPreviews] = useState<string[]>([]);
+
   const emirateOptions = ['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain'];
   const bodyTypes = ['SUV', 'Sedan', 'Coupe', 'Convertible', 'Hatchback', 'Truck'];
-  const horsepowerOptions = ['Under 200 HP', '200 - 300 HP', '300 - 400 HP', '400 - 500 HP', '500+ HP'];
-  const cylinderOptions = ['4 Cylinder', '6 Cylinder', '8 Cylinder', '10+ Cylinder'];
+  const cylinderOptions = ['3 Cylinder', '4 Cylinder', '6 Cylinder', '8 Cylinder', '10 Cylinder', '12 Cylinder', 'Electric / None'];
   const accidentOptions = ['Clean (No Accidents)', 'Minor Cosmetic Paint', 'Accident Repaired'];
   const warrantyOptions = ['Under Agency Warranty', 'No Warranty / Expired'];
 
-  const availableModels = formData.make
-    ? carData.makes.find((m) => m.make.toLowerCase() === formData.make.toLowerCase())?.models || []
-    : [];
+  const availableModels = formData.make && formData.make !== 'Other'
+    ? carData.makes.find((m) => m.make.toLowerCase() === formData.make.toLowerCase())?.models || ['Other']
+    : ['Other'];
 
   const handlePhotosChange = (
     slots: Record<PhotoSlotKey, File | null>,
@@ -75,10 +78,25 @@ export default function SellPage() {
     setDirectUrls(urls);
   };
 
-  const uploadFileToSupabase = async (file: File): Promise<string> => {
+  const handleServiceDocUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    const remaining = 5 - serviceDocs.length;
+    const toAdd = Array.from(files).slice(0, remaining);
+    const newPreviews = toAdd.map((f) => URL.createObjectURL(f));
+    setServiceDocs([...serviceDocs, ...toAdd]);
+    setServiceDocPreviews([...serviceDocPreviews, ...newPreviews]);
+  };
+
+  const removeServiceDoc = (idx: number) => {
+    setServiceDocs(serviceDocs.filter((_, i) => i !== idx));
+    setServiceDocPreviews(serviceDocPreviews.filter((_, i) => i !== idx));
+  };
+
+  const uploadFileToSupabase = async (file: File, bucket = 'car-photos'): Promise<string> => {
     const filename = `${Date.now()}_${Math.random().toString(36).substring(7)}.webp`;
-    const { error } = await supabase.storage.from('car-photos').upload(filename, file, {
-      contentType: 'image/webp',
+    const { error } = await supabase.storage.from(bucket).upload(filename, file, {
+      contentType: file.type || 'image/webp',
       upsert: true,
     });
 
@@ -90,7 +108,7 @@ export default function SellPage() {
       });
     }
 
-    const { data: publicData } = supabase.storage.from('car-photos').getPublicUrl(filename);
+    const { data: publicData } = supabase.storage.from(bucket).getPublicUrl(filename);
     return publicData.publicUrl;
   };
 
@@ -100,52 +118,60 @@ export default function SellPage() {
     setErrorMsg(null);
 
     try {
-      const uploadedUrls: string[] = [];
-
+      const uploadedImageUrls: string[] = [];
       for (const key of Object.keys(photoSlots) as PhotoSlotKey[]) {
         const file = photoSlots[key];
         if (file) {
-          const url = await uploadFileToSupabase(file);
-          uploadedUrls.push(url);
+          const url = await uploadFileToSupabase(file, 'car-photos');
+          uploadedImageUrls.push(url);
         } else if (directUrls[key]) {
-          uploadedUrls.push(directUrls[key]);
+          uploadedImageUrls.push(directUrls[key]);
         }
       }
-
       for (const extra of extraPhotos) {
-        const url = await uploadFileToSupabase(extra);
-        uploadedUrls.push(url);
+        const url = await uploadFileToSupabase(extra, 'car-photos');
+        uploadedImageUrls.push(url);
       }
 
+      const uploadedServiceUrls: string[] = [];
+      for (const doc of serviceDocs) {
+        const url = await uploadFileToSupabase(doc, 'car-photos');
+        uploadedServiceUrls.push(url);
+      }
+
+      const finalMake = formData.make === 'Other' && formData.custom_make ? formData.custom_make.trim() : formData.make;
+      const finalModel = (formData.model === 'Other' || formData.make === 'Other') && formData.custom_model ? formData.custom_model.trim() : formData.model;
+
       const payload = {
-        make: formData.make,
-        model: formData.model,
+        make: finalMake,
+        model: finalModel,
         year: parseInt(formData.year, 10) || new Date().getFullYear(),
         trim: formData.trim || null,
+        transmission: formData.transmission || 'Automatic',
         specs: formData.specs || 'GCC Specs',
-        body_type: formData.body_type || null,
-        horsepower: formData.horsepower || null,
-        cylinders: formData.cylinders || null,
-        accident_history: formData.accident_history || 'Clean (No Accidents)',
-        warranty: formData.warranty || 'No Warranty / Expired',
-        exterior_color: formData.exterior_color || null,
         mileage: parseInt(formData.mileage, 10) || 0,
         price: parseInt(formData.price, 10) || 0,
         city: formData.city || 'Dubai',
-        transmission: formData.transmission || 'Automatic',
-        fuel_type: formData.fuel_type || 'Petrol',
+        accident_history: formData.accident_history || 'Clean (No Accidents)',
+        warranty: formData.warranty || 'No Warranty / Expired',
+        horsepower: formData.horsepower ? `${formData.horsepower.replace(/[^0-9]/g, '')} HP` : null,
+        cylinders: formData.cylinders || null,
+        body_type: formData.body_type || null,
+        exterior_color: formData.exterior_color || null,
         previous_owners: parseInt(formData.previous_owners, 10) || 1,
+        fuel_type: formData.fuel_type || 'Petrol',
         description: formData.description,
         last_service_date: formData.last_service_date || null,
         service_notes: formData.service_notes || null,
+        service_record_urls: uploadedServiceUrls,
         seller_name: formData.seller_name || (isAr ? 'مالك السيارة' : 'Vehicle Owner'),
         seller_phone: formData.seller_phone || null,
-        image_urls: uploadedUrls,
+        image_urls: uploadedImageUrls,
       };
 
       const { data, error } = await supabase.from('listings').insert([payload]).select();
-
       if (error) throw error;
+
       setSuccess(true);
       if (data && data[0]?.id) {
         setTimeout(() => router.push(`/listing/${data[0].id}`), 1200);
@@ -161,7 +187,6 @@ export default function SellPage() {
   return (
     <div className="min-h-screen bg-[#f4f4f4] py-8">
       <div className="max-w-3xl mx-auto px-4">
-        {/* Header */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-6">
           <h1 className="text-2xl font-black text-slate-900">
             {isAr ? 'بيع سيارتك في الإمارات' : 'List Your Vehicle'}
@@ -190,49 +215,87 @@ export default function SellPage() {
             )}
 
             {/* STEP 1: VEHICLE SPECIFICATIONS */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <Car className="w-4 h-4 text-[#e03a14]" />
                 <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                  {isAr ? 'الخطوة ١: معلومات ومواصفات السيارة' : 'Step 1: Vehicle Information'}
+                  {t('step1')}
                 </h2>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Make */}
+                {/* 1. Make */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('make')} *</label>
                   <select
                     required
                     value={formData.make}
-                    onChange={(e) => setFormData({ ...formData, make: e.target.value, model: '' })}
+                    onChange={(e) => setFormData({ ...formData, make: e.target.value, model: '', custom_make: '', custom_model: '' })}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
                   >
                     <option value="">{t('selectMake')}</option>
                     {carData.makes.map((item) => (
-                      <option key={item.make} value={item.make}>{t(item.make)}</option>
+                      <option key={item.make} value={item.make}>
+                        {isAr ? t(item.make) : item.make}
+                      </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Model */}
+                {/* Custom Make if "Other" */}
+                {formData.make === 'Other' && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      {isAr ? 'اسم الماركة المخصصة' : 'Custom Make Name'} *
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      placeholder="e.g. Lucid, Rivian"
+                      value={formData.custom_make}
+                      onChange={(e) => setFormData({ ...formData, custom_make: e.target.value })}
+                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                    />
+                  </div>
+                )}
+
+                {/* 2. Model */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('model')} *</label>
                   <select
                     required
                     disabled={!formData.make}
                     value={formData.model}
-                    onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, model: e.target.value, custom_model: '' })}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white disabled:bg-slate-100"
                   >
-                    <option value="">{formData.make ? t('selectModel') : (isAr ? 'اختر الماركة أولاً' : 'Select Make First')}</option>
+                    <option value="">{formData.make ? t('selectModel') : t('selectMakeFirst')}</option>
                     {availableModels.map((mod) => (
-                      <option key={mod} value={mod}>{mod}</option>
+                      <option key={mod} value={mod}>
+                        {isAr ? t(mod) : mod}
+                      </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Year */}
+                {/* Custom Model if "Other" */}
+                {(formData.model === 'Other' || formData.make === 'Other') && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      {isAr ? 'اسم الموديل المخصص' : 'Custom Model Name'} *
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      placeholder="e.g. Air Sapphire"
+                      value={formData.custom_model}
+                      onChange={(e) => setFormData({ ...formData, custom_model: e.target.value })}
+                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                    />
+                  </div>
+                )}
+
+                {/* 3. Year */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('year')} *</label>
                   <select
@@ -248,21 +311,34 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* Trim */}
+                {/* 4. Trim */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    {isAr ? 'الفئة / الإصدار' : 'Trim / Edition'}
-                  </label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('trim')}</label>
                   <input
                     type="text"
-                    placeholder="e.g. Carrera S, AMG, GTS, Turbo"
+                    placeholder="e.g. Carrera S, AMG, GTS"
                     value={formData.trim}
                     onChange={(e) => setFormData({ ...formData, trim: e.target.value })}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
                   />
                 </div>
 
-                {/* Regional Specs */}
+                {/* 5. Transmission */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('transmission')} *</label>
+                  <select
+                    required
+                    value={formData.transmission}
+                    onChange={(e) => setFormData({ ...formData, transmission: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                  >
+                    <option value="">{t('selectTransmission')}</option>
+                    <option value="Automatic">{t('Automatic')}</option>
+                    <option value="Manual">{t('Manual')}</option>
+                  </select>
+                </div>
+
+                {/* 6. Regional Specs */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('specs')} *</label>
                   <select
@@ -279,7 +355,49 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* Accident History (Dubizzle Spec) */}
+                {/* 7. Mileage */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('mileageKm')} *</label>
+                  <input
+                    required
+                    type="number"
+                    placeholder="e.g. 45000"
+                    value={formData.mileage}
+                    onChange={(e) => setFormData({ ...formData, mileage: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                  />
+                </div>
+
+                {/* 8. Price */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('priceAed')} *</label>
+                  <input
+                    required
+                    type="number"
+                    placeholder="e.g. 175000"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                  />
+                </div>
+
+                {/* 9. Location / Emirate */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('emirate')} *</label>
+                  <select
+                    required
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                  >
+                    <option value="">{t('selectEmirate')}</option>
+                    {emirateOptions.map((em) => (
+                      <option key={em} value={em}>{t(em)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 10. Accident History */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('accidentHistory')} *</label>
                   <select
@@ -295,7 +413,7 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* Warranty Status (Dubizzle Spec) */}
+                {/* 11. Warranty Status */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('warranty')} *</label>
                   <select
@@ -311,7 +429,34 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* Body Type */}
+                {/* 12. Horse Power (HP) */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('horsepower')}</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 450"
+                    value={formData.horsepower}
+                    onChange={(e) => setFormData({ ...formData, horsepower: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                  />
+                </div>
+
+                {/* 13. Cylinders */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('cylinders')}</label>
+                  <select
+                    value={formData.cylinders}
+                    onChange={(e) => setFormData({ ...formData, cylinders: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                  >
+                    <option value="">{t('selectCylinders')}</option>
+                    {cylinderOptions.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 14. Body Type */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('bodyType')}</label>
                   <select
@@ -326,37 +471,7 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* Horsepower */}
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('horsepower')}</label>
-                  <select
-                    value={formData.horsepower}
-                    onChange={(e) => setFormData({ ...formData, horsepower: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
-                  >
-                    <option value="">{t('selectHorsepower')}</option>
-                    {horsepowerOptions.map((opt) => (
-                      <option key={opt} value={opt}>{t(opt)}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Cylinders */}
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('cylinders')}</label>
-                  <select
-                    value={formData.cylinders}
-                    onChange={(e) => setFormData({ ...formData, cylinders: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
-                  >
-                    <option value="">{t('selectCylinders')}</option>
-                    {cylinderOptions.map((opt) => (
-                      <option key={opt} value={opt}>{t(opt)}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Previous Owners */}
+                {/* 15. Previous Owners */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('previousOwners')} *</label>
                   <select
@@ -373,73 +488,16 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* Exterior Color */}
+                {/* 16. Exterior Color */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">{t('exteriorColor')}</label>
                   <input
                     type="text"
-                    placeholder="e.g. Black, Chalk White, Nardo Grey"
+                    placeholder="e.g. Chalk White, Nardo Grey"
                     value={formData.exterior_color}
                     onChange={(e) => setFormData({ ...formData, exterior_color: e.target.value })}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
                   />
-                </div>
-
-                {/* Mileage */}
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('mileage')} (km) *</label>
-                  <input
-                    required
-                    type="number"
-                    placeholder="e.g. 45000"
-                    value={formData.mileage}
-                    onChange={(e) => setFormData({ ...formData, mileage: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
-                  />
-                </div>
-
-                {/* Price */}
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('price')} (AED) *</label>
-                  <input
-                    required
-                    type="number"
-                    placeholder="e.g. 175000"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
-                  />
-                </div>
-
-                {/* Emirate */}
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('emirate')} *</label>
-                  <select
-                    required
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
-                  >
-                    <option value="">{t('selectEmirate')}</option>
-                    {emirateOptions.map((em) => (
-                      <option key={em} value={em}>{t(em)}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Transmission */}
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t('transmission')} *</label>
-                  <select
-                    required
-                    value={formData.transmission}
-                    onChange={(e) => setFormData({ ...formData, transmission: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
-                  >
-                    <option value="">{t('selectTransmission')}</option>
-                    <option value="Automatic">{t('Automatic')}</option>
-                    <option value="Manual">{t('Manual')}</option>
-                  </select>
                 </div>
               </div>
 
@@ -461,7 +519,7 @@ export default function SellPage() {
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <Camera className="w-4 h-4 text-[#e03a14]" />
                 <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                  {isAr ? 'الخطوة ٢: صور السيارة' : 'Step 2: Vehicle Photos'}
+                  {t('step2')}
                 </h2>
               </div>
               <PhotoSlotUploader onChange={handlePhotosChange} />
@@ -472,14 +530,14 @@ export default function SellPage() {
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <FileText className="w-4 h-4 text-[#e03a14]" />
                 <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                  {isAr ? 'الخطوة ٣: سجل الصيانة' : 'Step 3: Service History'}
+                  {t('step3')}
                 </h2>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    {isAr ? 'تاريخ آخر صيانة' : 'Last Service Date'}
+                    {t('lastServiced')}
                   </label>
                   <input
                     type="date"
@@ -494,11 +552,50 @@ export default function SellPage() {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Major agency service, fresh Michelin tires"
+                    placeholder="e.g. Major agency service, fresh tires"
                     value={formData.service_notes}
                     onChange={(e) => setFormData({ ...formData, service_notes: e.target.value })}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
                   />
+                </div>
+              </div>
+
+              {/* Service Photos */}
+              <div className="pt-2 border-t border-slate-100">
+                <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                  {isAr ? 'صور فواتير الصيانة وسجل الوكالة (اختياري، حتى ٥ صور)' : 'Upload Service Invoices / Warranty Booklet (Optional, Max 5)'}
+                </label>
+                
+                <div className="flex flex-wrap gap-3 items-center">
+                  {serviceDocPreviews.map((url, i) => (
+                    <div key={i} className="relative w-24 h-20 rounded-xl overflow-hidden border border-slate-200 group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`Service Doc ${i + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeServiceDoc(i)}
+                        className="absolute top-1 right-1 p-1 bg-black/70 text-white rounded-full hover:bg-red-600 transition"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {serviceDocs.length < 5 && (
+                    <label className="w-24 h-20 border-2 border-dashed border-slate-300 hover:border-[#e03a14] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition">
+                      <UploadCloud className="w-5 h-5 text-slate-400" />
+                      <span className="text-[10px] font-semibold text-slate-500 mt-1">
+                        {isAr ? 'إضافة صورة' : 'Add Photo'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        multiple
+                        className="hidden"
+                        onChange={handleServiceDocUpload}
+                      />
+                    </label>
+                  )}
                 </div>
               </div>
             </div>
@@ -508,7 +605,7 @@ export default function SellPage() {
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <User className="w-4 h-4 text-[#e03a14]" />
                 <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                  {isAr ? 'الخطوة ٤: معلومات البائع' : 'Step 4: Seller Details'}
+                  {t('step4')}
                 </h2>
               </div>
 
