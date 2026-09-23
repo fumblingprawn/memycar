@@ -143,13 +143,11 @@ export default function SellPage() {
     return publicData.publicUrl;
   };
 
-  // Form submit button triggers the Terms Modal first
   const handlePreSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setShowTermsModal(true);
   };
 
-  // Final Publish after agreeing to terms
   const handleFinalPublish = async () => {
     if (!agreedToTerms) return;
     setShowTermsModal(false);
@@ -185,15 +183,22 @@ export default function SellPage() {
 
       const finalMake = formData.make === 'Other' && formData.custom_make ? formData.custom_make.trim() : formData.make;
       const finalModel = (formData.model === 'Other' || formData.make === 'Other') && formData.custom_model ? formData.custom_model.trim() : formData.model;
+      const finalYear = parseInt(formData.year, 10) || new Date().getFullYear();
+      const finalTrim = formData.trim ? formData.trim.trim() : null;
+
+      // Construct Title required by not-null constraint
+      const finalTitle = `${finalYear} ${finalMake} ${finalModel}${finalTrim ? ' ' + finalTrim : ''}`;
+
       const sellerDisplayName = formData.seller_name || authData?.user?.email?.split('@')[0] || (isAr ? 'مالك السيارة' : 'Vehicle Owner');
       const sellerDisplayPhone = formData.seller_phone || null;
 
       const payload: any = {
+        title: finalTitle,
         user_id: currentUserId,
         make: finalMake,
         model: finalModel,
-        year: parseInt(formData.year, 10) || new Date().getFullYear(),
-        trim: formData.trim || null,
+        year: finalYear,
+        trim: finalTrim,
         transmission: formData.transmission || 'Automatic',
         specs: formData.specs || 'GCC Specs',
         mileage: parseInt(formData.mileage, 10) || 0,
@@ -648,7 +653,7 @@ export default function SellPage() {
               </div>
             </div>
 
-            {/* STEP 4: SELLER DETAILS (Auto-Filled from Account) */}
+            {/* STEP 4: SELLER DETAILS */}
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <User className="w-4 h-4 text-[#e03a14]" />
@@ -737,7 +742,6 @@ export default function SellPage() {
                 </div>
               </div>
 
-              {/* Checkbox */}
               <label className="flex items-center gap-2.5 cursor-pointer select-none mb-6">
                 <input
                   type="checkbox"
