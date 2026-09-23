@@ -18,7 +18,8 @@ import {
   Phone,
   CheckCircle2,
   AlertCircle,
-  Loader2
+  Loader2,
+  Lock
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -35,6 +36,7 @@ export default function DashboardPage() {
   // Profile Form State
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [isLocked, setIsLocked] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -49,8 +51,15 @@ export default function DashboardPage() {
     }
 
     setUser(user);
-    setFullName(user.user_metadata?.full_name || '');
-    setPhone(user.user_metadata?.phone || '');
+    const savedName = user.user_metadata?.full_name || '';
+    const savedPhone = user.user_metadata?.phone || '';
+    setFullName(savedName);
+    setPhone(savedPhone);
+
+    // If both name and phone are already set, lock them
+    if (savedName && savedPhone) {
+      setIsLocked(true);
+    }
 
     // 1. Fetch user's listings
     const { data: listings } = await supabase
@@ -86,8 +95,10 @@ export default function DashboardPage() {
     fetchUserData();
   }, [fetchUserData]);
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
+  const handleSaveAndLock = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLocked) return;
+
     setProfileSaving(true);
     setProfileSuccess(false);
     setProfileError(null);
@@ -107,7 +118,6 @@ export default function DashboardPage() {
     }
 
     try {
-      // Format number to international UAE standard
       let formattedPhone = cleanPhone;
       if (formattedPhone.startsWith('05')) {
         formattedPhone = '+971' + formattedPhone.slice(1);
@@ -127,11 +137,11 @@ export default function DashboardPage() {
       if (data.user) {
         setUser(data.user);
         setPhone(formattedPhone);
+        setIsLocked(true);
         setProfileSuccess(true);
-        setTimeout(() => setProfileSuccess(false), 3000);
       }
     } catch (err: any) {
-      setProfileError(err?.message || 'Failed to update profile details.');
+      setProfileError(err?.message || 'Failed to save profile details.');
     } finally {
       setProfileSaving(false);
     }
@@ -344,18 +354,31 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* TAB 3: ACCOUNT & CONTACT SETTINGS */}
+        {/* TAB 3: ACCOUNT & CONTACT SETTINGS (LOCKED / UNLOCKED) */}
         {activeTab === 'account' && (
           <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-lg shadow-sm space-y-6">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                {isAr ? 'بيانات البائع والحساب' : 'Seller Profile & Contact'}
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                {isAr 
-                  ? 'سيتم استخدام هذا الاسم ورقم الهاتف تلقائياً في كافة إعلانات سياراتك المعروضة للبيع.'
-                  : 'This name and phone number will be used automatically on all your vehicle listings.'}
-              </p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  {isAr ? 'بيانات البائع والحساب' : 'Seller Profile & Contact'}
+                  {isLocked && <Lock className="w-4 h-4 text-emerald-600" />}
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  {isLocked 
+                    ? (isAr 
+                        ? 'تم تثبيت وتوثيق بياناتك لحماية مصداقية الإعلانات ومنع التغييرات العشوائية.'
+                        : 'Your seller profile is locked and verified to maintain transparency across all your listings.')
+                    : (isAr
+                        ? 'أدخل اسمك ورقم هاتفك. سيتم تثبيت البيانات تلقائياً بعد الحفظ.'
+                        : 'Enter your seller name and phone number. These will be permanently locked once saved.')}
+                </p>
+              </div>
+              {isLocked && (
+                <span className="bg-emerald-50 text-emerald-700 text-[11px] font-bold px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1 flex-shrink-0">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  {isAr ? 'بيانات مقفلة وموثقة' : 'Verified & Locked'}
+                </span>
+              )}
             </div>
 
             {profileError && (
@@ -368,12 +391,12 @@ export default function DashboardPage() {
             {profileSuccess && (
               <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl flex items-center gap-2 font-bold">
                 <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                <span>{isAr ? 'تم تحديث بياناتك بنجاح!' : 'Profile updated successfully!'}</span>
+                <span>{isAr ? 'تم حفظ وتثبيت بياناتك بنجاح!' : 'Profile details saved and locked successfully!'}</span>
               </div>
             )}
 
-            <form onSubmit={handleUpdateProfile} className="space-y-4">
-              {/* Email (Read-only) */}
+            <form onSubmit={handleSaveAndLock} className="space-y-4">
+              {/* Email (Always Disabled) */}
               <div>
                 <label className="text-xs font-semibold text-slate-500 block mb-1">
                   {t('email')}
@@ -382,55 +405,93 @@ export default function DashboardPage() {
                   disabled
                   type="email"
                   value={user?.email || ''}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 text-slate-500"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed"
                 />
               </div>
 
               {/* Full Name / Dealer Name */}
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  {isAr ? 'اسم البائع / المعرض *' : 'Seller / Display Name *'}
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    {isAr ? 'اسم البائع / المعرض *' : 'Seller / Display Name *'}
+                  </label>
+                  {isLocked && (
+                    <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-slate-400" />
+                      {isAr ? 'مغلق' : 'Locked'}
+                    </span>
+                  )}
+                </div>
                 <input
                   required
+                  disabled={isLocked}
                   type="text"
-                  placeholder="e.g. Salim Al Nuaimi / Apex Motors"
+                  placeholder="e.g. DXB01 / Apex Motors"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14]"
+                  className={`w-full px-3 py-2 text-sm rounded-xl border transition ${
+                    isLocked
+                      ? 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed font-semibold'
+                      : 'border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]'
+                  }`}
                 />
               </div>
 
-              {/* Phone Number with UAE Validation */}
+              {/* UAE Phone Number */}
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  {isAr ? 'رقم الهاتف / الواتساب في الإمارات *' : 'UAE Phone / WhatsApp *'}
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    {isAr ? 'رقم الهاتف / الواتساب في الإمارات *' : 'UAE Phone / WhatsApp *'}
+                  </label>
+                  {isLocked && (
+                    <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-slate-400" />
+                      {isAr ? 'مغلق' : 'Locked'}
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
                   <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     required
+                    disabled={isLocked}
                     type="tel"
                     dir="ltr"
-                    placeholder="+971 50 123 4567 or 0501234567"
+                    placeholder="+971 55 838 8386 or 0558388386"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14]"
+                    className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border transition ${
+                      isLocked
+                        ? 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed font-semibold'
+                        : 'border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]'
+                    }`}
                   />
                 </div>
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  {isAr ? 'أرقام الهواتف المحمولة المعتمدة: 050، 052، 054، 055، 056، 058' : 'Valid UAE carriers: 050, 052, 054, 055, 056, 058'}
-                </span>
               </div>
 
-              <button
-                type="submit"
-                disabled={profileSaving}
-                className="bg-[#e03a14] hover:bg-[#c53210] disabled:bg-slate-300 text-white text-xs font-bold py-2.5 px-5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
-              >
-                {profileSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                {isAr ? 'حفظ التعديلات' : 'Save Changes'}
-              </button>
+              {/* Action Button: Locked vs Save */}
+              {isLocked ? (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-500 leading-relaxed">
+                  <span className="font-semibold text-slate-700 block mb-0.5">
+                    {isAr ? 'هل تحتاج إلى تغيير رقم هاتفك أو اسمك؟' : 'Need to update your verified credentials?'}
+                  </span>
+                  {isAr 
+                    ? 'لحماية المشترين ومصداقية الإعلانات، يرجى التواصل مع فريق الدعم على ' 
+                    : 'To protect buyers and listings integrity, please contact support at '}
+                  <a href="mailto:support@memycar.com" className="text-[#e03a14] font-bold underline">
+                    support@memycar.com
+                  </a>
+                </div>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={profileSaving}
+                  className="bg-[#e03a14] hover:bg-[#c53210] disabled:bg-slate-300 text-white text-xs font-bold py-2.5 px-5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  {profileSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {isAr ? 'حفظ وتثبيت البيانات' : 'Save & Lock Details'}
+                </button>
+              )}
             </form>
 
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
