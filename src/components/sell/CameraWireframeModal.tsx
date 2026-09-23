@@ -53,22 +53,20 @@ export default function CameraWireframeModal({
     let mediaStream: MediaStream | null = null;
 
     try {
-      // 1. Try mobile rear camera first
       mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' } },
         audio: false,
       });
     } catch (e1) {
-      console.warn('Rear camera unavailable, trying any camera:', e1);
+      console.warn('Rear camera unavailable, trying fallback camera:', e1);
       try {
-        // 2. Fallback to any camera (laptop webcam, front camera)
         mediaStream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: false,
         });
       } catch (e2: any) {
         console.error('All camera attempts failed:', e2);
-        setError(e2?.message || 'Camera permission denied or camera is currently busy.');
+        setError(e2?.message || 'Camera permission denied or camera in use.');
         setIsInitializing(false);
         return;
       }
@@ -77,7 +75,6 @@ export default function CameraWireframeModal({
     if (mediaStream && videoRef.current) {
       streamRef.current = mediaStream;
       videoRef.current.srcObject = mediaStream;
-      
       videoRef.current.onloadedmetadata = async () => {
         try {
           if (videoRef.current) {
@@ -148,59 +145,102 @@ export default function CameraWireframeModal({
 
   if (!isOpen) return null;
 
+  // Clear, distinct car silhouette wireframes
   const renderSilhouette = () => {
     switch (slotKey) {
       case 'front_three_quarter':
         return (
-          <svg className="w-full h-full max-h-[75vh] text-white/85 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
-            <path strokeWidth="3" strokeDasharray="8 6" d="
-              M 110,340 
-              C 120,320 150,305 180,305 
-              C 210,305 240,320 250,345 
-              L 540,345 
-              C 550,310 590,290 635,290 
-              C 680,290 715,315 725,350 
-              L 750,340 
-              C 765,315 760,270 710,250 
-              L 580,230 
-              L 470,140 
-              C 450,125 360,125 300,140 
-              L 190,230 
-              C 130,240 90,270 85,305 
-              C 80,335 95,340 110,340 Z
+          <svg className="w-full h-full max-h-[75vh] drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]" viewBox="0 0 800 500" fill="none">
+            {/* Ground Baseline */}
+            <line x1="80" y1="410" x2="740" y2="410" stroke="#f97316" strokeWidth="2.5" strokeDasharray="8 6" opacity="0.8" />
+            
+            {/* Main Outer Body Contour */}
+            <path stroke="#ffffff" strokeWidth="3.5" strokeDasharray="9 5" d="
+              M 115,350 
+              C 125,325 155,305 190,305 
+              C 225,305 255,325 265,355 
+              L 545,355 
+              C 555,320 595,295 640,295 
+              C 685,295 720,320 730,360 
+              L 755,350 
+              C 775,320 770,270 715,245 
+              L 580,225 
+              L 475,130 
+              C 450,115 360,115 300,130 
+              L 190,225 
+              C 130,235 90,265 85,305 
+              C 80,340 95,350 115,350 Z
             " />
-            <circle cx="180" cy="355" r="50" strokeWidth="3.5" strokeDasharray="6 4" />
-            <circle cx="635" cy="340" r="45" strokeWidth="3.5" strokeDasharray="6 4" />
-            <path strokeWidth="2.5" strokeDasharray="5 5" d="M 300,140 L 470,140 L 450,230 L 220,230 Z" />
-            <text x="50%" y="60" fill="currentColor" textAnchor="middle" fontSize="18" fontWeight="bold" letterSpacing="1">
-              ALIGN FRONT 3/4 (DRIVER + HOOD)
+
+            {/* Front & Rear Tire Markers with Center Hubs */}
+            <circle cx="190" cy="360" r="52" stroke="#ffffff" strokeWidth="3.5" />
+            <circle cx="190" cy="360" r="16" stroke="#f97316" strokeWidth="2.5" strokeDasharray="4 3" />
+            <circle cx="640" cy="345" r="46" stroke="#ffffff" strokeWidth="3.5" />
+            <circle cx="640" cy="345" r="14" stroke="#f97316" strokeWidth="2.5" strokeDasharray="4 3" />
+
+            {/* Greenhouse (Windshield & Roofline) */}
+            <path stroke="#38bdf8" strokeWidth="2.5" strokeDasharray="6 4" d="M 300,130 L 475,130 L 450,225 L 220,225 Z" />
+            <line x1="325" y1="130" x2="310" y2="225" stroke="#38bdf8" strokeWidth="2" strokeDasharray="4 4" />
+
+            {/* Headlight & Driver Side Hood Ridge */}
+            <path stroke="#facc15" strokeWidth="2.5" strokeDasharray="5 4" d="M 110,290 C 145,282 185,278 230,270" />
+            <ellipse cx="140" cy="285" rx="14" ry="7" stroke="#facc15" strokeWidth="2" />
+
+            {/* Side Mirror */}
+            <ellipse cx="280" cy="215" rx="16" ry="10" stroke="#ffffff" strokeWidth="2.5" />
+
+            {/* Directional HUD Badge */}
+            <rect x="230" y="30" width="340" height="34" rx="17" fill="rgba(0,0,0,0.6)" stroke="#f97316" strokeWidth="1.5" />
+            <text x="400" y="52" fill="#ffffff" textAnchor="middle" fontSize="14" fontWeight="bold" letterSpacing="1">
+              ALIGN FRONT 3/4 (DRIVER SIDE + NOSE)
             </text>
           </svg>
         );
 
       case 'rear_three_quarter':
         return (
-          <svg className="w-full h-full max-h-[75vh] text-white/85 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
-            <path strokeWidth="3" strokeDasharray="8 6" d="
-              M 700,340 
-              C 690,320 660,305 630,305 
-              C 600,305 570,320 560,345 
-              L 270,345 
-              C 260,310 220,290 175,290 
-              C 130,290 95,315 85,350 
-              L 60,340 
-              C 45,315 50,270 100,250 
-              L 230,230 
-              L 340,140 
-              C 360,125 450,125 510,140 
-              L 620,230 
-              C 680,240 720,270 725,305 
-              C 730,335 715,340 700,340 Z
+          <svg className="w-full h-full max-h-[75vh] drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]" viewBox="0 0 800 500" fill="none">
+            {/* Ground Baseline */}
+            <line x1="60" y1="410" x2="720" y2="410" stroke="#f97316" strokeWidth="2.5" strokeDasharray="8 6" opacity="0.8" />
+
+            {/* Main Outer Body Contour */}
+            <path stroke="#ffffff" strokeWidth="3.5" strokeDasharray="9 5" d="
+              M 685,350 
+              C 675,325 645,305 610,305 
+              C 575,305 545,325 535,355 
+              L 255,355 
+              C 245,320 205,295 160,295 
+              C 115,295 80,320 70,360 
+              L 45,350 
+              C 25,320 30,270 85,245 
+              L 220,225 
+              L 325,130 
+              C 350,115 440,115 500,130 
+              L 610,225 
+              C 670,235 710,265 715,305 
+              C 720,340 705,350 685,350 Z
             " />
-            <circle cx="630" cy="355" r="50" strokeWidth="3.5" strokeDasharray="6 4" />
-            <circle cx="175" cy="340" r="45" strokeWidth="3.5" strokeDasharray="6 4" />
-            <path strokeWidth="2.5" strokeDasharray="5 5" d="M 510,140 L 340,140 L 360,230 L 590,230 Z" />
-            <text x="50%" y="60" fill="currentColor" textAnchor="middle" fontSize="18" fontWeight="bold" letterSpacing="1">
+
+            {/* Rear & Front Tire Markers */}
+            <circle cx="610" cy="360" r="52" stroke="#ffffff" strokeWidth="3.5" />
+            <circle cx="610" cy="360" r="16" stroke="#f97316" strokeWidth="2.5" strokeDasharray="4 3" />
+            <circle cx="160" cy="345" r="46" stroke="#ffffff" strokeWidth="3.5" />
+            <circle cx="160" cy="345" r="14" stroke="#f97316" strokeWidth="2.5" strokeDasharray="4 3" />
+
+            {/* Rear Windshield & Roof Pillar */}
+            <path stroke="#38bdf8" strokeWidth="2.5" strokeDasharray="6 4" d="M 500,130 L 325,130 L 350,225 L 580,225 Z" />
+            <line x1="475" y1="130" x2="490" y2="225" stroke="#38bdf8" strokeWidth="2" strokeDasharray="4 4" />
+
+            {/* Taillights & Trunk Ridge */}
+            <path stroke="#ef4444" strokeWidth="3" strokeDasharray="5 4" d="M 690,290 C 655,282 615,278 570,270" />
+            <ellipse cx="660" cy="285" rx="14" ry="7" stroke="#ef4444" strokeWidth="2" fill="rgba(239,68,68,0.3)" />
+
+            {/* Passenger Side Mirror */}
+            <ellipse cx="520" cy="215" rx="16" ry="10" stroke="#ffffff" strokeWidth="2.5" />
+
+            {/* Directional HUD Badge */}
+            <rect x="230" y="30" width="340" height="34" rx="17" fill="rgba(0,0,0,0.6)" stroke="#f97316" strokeWidth="1.5" />
+            <text x="400" y="52" fill="#ffffff" textAnchor="middle" fontSize="14" fontWeight="bold" letterSpacing="1">
               ALIGN REAR 3/4 (TAILLIGHTS + TRUNK)
             </text>
           </svg>
@@ -208,8 +248,9 @@ export default function CameraWireframeModal({
 
       case 'side_profile':
         return (
-          <svg className="w-full h-full max-h-[75vh] text-white/85 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
-            <path strokeWidth="3" strokeDasharray="8 6" d="
+          <svg className="w-full h-full max-h-[75vh] drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]" viewBox="0 0 800 500" fill="none">
+            <line x1="40" y1="410" x2="760" y2="410" stroke="#f97316" strokeWidth="2.5" strokeDasharray="8 6" opacity="0.8" />
+            <path stroke="#ffffff" strokeWidth="3.5" strokeDasharray="9 5" d="
               M 60,360 L 120,360 
               C 130,305 180,275 240,275 
               C 300,275 350,305 360,360 
@@ -223,10 +264,12 @@ export default function CameraWireframeModal({
               L 160,210 L 70,240 
               C 40,265 40,320 60,360 Z
             " />
-            <circle cx="240" cy="355" r="55" strokeWidth="3.5" strokeDasharray="6 4" />
-            <circle cx="660" cy="355" r="55" strokeWidth="3.5" strokeDasharray="6 4" />
-            <path strokeWidth="2.5" strokeDasharray="5 5" d="M 270,125 L 440,125 L 530,205 L 185,205 Z" />
-            <text x="50%" y="60" fill="currentColor" textAnchor="middle" fontSize="18" fontWeight="bold" letterSpacing="1">
+            <circle cx="240" cy="355" r="55" stroke="#ffffff" strokeWidth="3.5" />
+            <circle cx="660" cy="355" r="55" stroke="#ffffff" strokeWidth="3.5" />
+            <path stroke="#38bdf8" strokeWidth="2.5" strokeDasharray="5 5" d="M 270,125 L 440,125 L 530,205 L 185,205 Z" />
+            <line x1="365" y1="125" x2="365" y2="205" stroke="#38bdf8" strokeWidth="2" strokeDasharray="4 4" />
+            <rect x="240" y="30" width="320" height="34" rx="17" fill="rgba(0,0,0,0.6)" stroke="#f97316" strokeWidth="1.5" />
+            <text x="400" y="52" fill="#ffffff" textAnchor="middle" fontSize="14" fontWeight="bold" letterSpacing="1">
               ALIGN FULL SIDE PROFILE (LEVEL)
             </text>
           </svg>
@@ -234,12 +277,13 @@ export default function CameraWireframeModal({
 
       case 'interior_dash':
         return (
-          <svg className="w-full h-full max-h-[75vh] text-white/85 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
-            <ellipse cx="260" cy="300" rx="100" ry="115" strokeWidth="3.5" strokeDasharray="8 6" />
-            <circle cx="260" cy="300" r="35" strokeWidth="2" strokeDasharray="4 4" />
-            <rect x="420" y="210" width="220" height="150" rx="14" strokeWidth="3" strokeDasharray="6 4" />
-            <text x="50%" y="60" fill="currentColor" textAnchor="middle" fontSize="18" fontWeight="bold" letterSpacing="1">
-              FRAME COCKPIT (STEERING + CENTER SCREEN)
+          <svg className="w-full h-full max-h-[75vh] drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]" viewBox="0 0 800 500" fill="none">
+            <ellipse cx="260" cy="300" rx="105" ry="120" stroke="#ffffff" strokeWidth="3.5" strokeDasharray="8 6" />
+            <circle cx="260" cy="300" r="35" stroke="#ffffff" strokeWidth="2" strokeDasharray="4 4" />
+            <rect x="420" y="210" width="220" height="150" rx="14" stroke="#38bdf8" strokeWidth="3" strokeDasharray="6 4" />
+            <rect x="230" y="30" width="340" height="34" rx="17" fill="rgba(0,0,0,0.6)" stroke="#f97316" strokeWidth="1.5" />
+            <text x="400" y="52" fill="#ffffff" textAnchor="middle" fontSize="14" fontWeight="bold" letterSpacing="1">
+              FRAME COCKPIT (STEERING + CONSOLE)
             </text>
           </svg>
         );
@@ -247,13 +291,14 @@ export default function CameraWireframeModal({
       case 'odometer':
       default:
         return (
-          <svg className="w-full h-full max-h-[75vh] text-white/85 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
-            <rect x="160" y="140" width="480" height="240" rx="28" strokeWidth="3.5" strokeDasharray="8 6" />
-            <circle cx="280" cy="260" r="65" strokeWidth="2" strokeDasharray="4 4" />
-            <circle cx="520" cy="260" r="65" strokeWidth="2" strokeDasharray="4 4" />
-            <rect x="360" y="270" width="80" height="40" rx="6" strokeWidth="2" strokeDasharray="3 3" />
-            <text x="50%" y="60" fill="currentColor" textAnchor="middle" fontSize="18" fontWeight="bold" letterSpacing="1">
-              FOCUS ODOMETER / DIGITAL MILEAGE
+          <svg className="w-full h-full max-h-[75vh] drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]" viewBox="0 0 800 500" fill="none">
+            <rect x="160" y="140" width="480" height="240" rx="28" stroke="#ffffff" strokeWidth="3.5" strokeDasharray="8 6" />
+            <circle cx="280" cy="260" r="65" stroke="#ffffff" strokeWidth="2" strokeDasharray="4 4" />
+            <circle cx="520" cy="260" r="65" stroke="#ffffff" strokeWidth="2" strokeDasharray="4 4" />
+            <rect x="360" y="270" width="80" height="40" rx="6" stroke="#f97316" strokeWidth="2" strokeDasharray="3 3" />
+            <rect x="230" y="30" width="340" height="34" rx="17" fill="rgba(0,0,0,0.6)" stroke="#f97316" strokeWidth="1.5" />
+            <text x="400" y="52" fill="#ffffff" textAnchor="middle" fontSize="14" fontWeight="bold" letterSpacing="1">
+              FOCUS ODOMETER / DIGITAL CLUSTER
             </text>
           </svg>
         );
@@ -281,7 +326,6 @@ export default function CameraWireframeModal({
 
       {/* Viewport */}
       <div className="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden bg-black">
-        {/* The video element remains in the DOM so refs and play() always attach cleanly */}
         <video
           ref={videoRef}
           autoPlay
@@ -292,7 +336,6 @@ export default function CameraWireframeModal({
           }`}
         />
 
-        {/* Loading Spinner */}
         {isInitializing && (
           <div className="flex flex-col items-center gap-3 text-white z-20">
             <Loader2 className="w-8 h-8 animate-spin text-[#e03a14]" />
@@ -300,7 +343,6 @@ export default function CameraWireframeModal({
           </div>
         )}
 
-        {/* Error Fallback Box */}
         {error && (
           <div className="text-center p-6 bg-slate-900 border border-slate-700 rounded-3xl max-w-sm mx-4 text-slate-200 shadow-2xl z-30">
             <CameraOff className="w-10 h-10 mx-auto mb-3 text-amber-400" />
@@ -335,7 +377,6 @@ export default function CameraWireframeModal({
           </div>
         )}
 
-        {/* Wireframe Silhouette */}
         {videoReady && !error && (
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-4 z-20">
             {renderSilhouette()}
