@@ -20,87 +20,86 @@ export default function CameraWireframeModal({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [capturing, setCapturing] = useState(false);
+  const [hasStream, setHasStream] = useState(false);
 
-  const cleanupCamera = useCallback(() => {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-      setStream(null);
+  const stopTracks = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
     }
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
-  }, [stream]);
+    setHasStream(false);
+  }, []);
 
   const initCamera = useCallback(async () => {
+    stopTracks();
     setIsInitializing(true);
     setError(null);
 
-    // Check mediaDevices support
     if (!navigator?.mediaDevices?.getUserMedia) {
-      setError('Live camera viewfinder is not supported on this browser. Use standard camera capture.');
+      setError('Live camera viewfinder is not supported on this browser. Use standard upload or device camera.');
       setIsInitializing(false);
       return;
     }
 
     try {
-      // Primary: Environment / Back camera with flexible mobile constraints
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment',
-        },
+      // Attempt 1: Environment (rear) camera
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
         audio: false,
       });
 
-      setStream(mediaStream);
+      streamRef.current = stream;
       if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play().catch((e) => console.warn('Auto-play blocked:', e));
-        };
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
       }
-    } catch (primaryErr) {
-      console.warn('Environment camera failed, trying fallback video constraints:', primaryErr);
+      setHasStream(true);
+    } catch (envErr) {
+      console.warn('Environment camera failed, attempting standard camera:', envErr);
       try {
-        // Fallback: Generic video stream (handles laptops/front cams or restricted environments)
+        // Attempt 2: Default camera (handles Mac/PC webcams or restricted browsers)
         const fallbackStream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: false,
         });
 
-        setStream(fallbackStream);
+        streamRef.current = fallbackStream;
         if (videoRef.current) {
           videoRef.current.srcObject = fallbackStream;
-          videoRef.current.onloadedmetadata = () => {
-            videoRef.current?.play().catch((e) => console.warn('Fallback play blocked:', e));
-          };
+          await videoRef.current.play().catch(() => {});
         }
-      } catch (fallbackErr: any) {
-        console.error('All camera attempts failed:', fallbackErr);
-        setError('Camera permission denied or camera in use by another app.');
+        setHasStream(true);
+      } catch (err: any) {
+        console.error('Camera access failed:', err);
+        setError(err?.message || 'Camera permission denied or camera unavailable.');
       }
     } finally {
       setIsInitializing(false);
     }
-  }, []);
+  }, [stopTracks]);
 
   useEffect(() => {
     if (isOpen) {
       initCamera();
     } else {
-      cleanupCamera();
+      stopTracks();
     }
+
     return () => {
-      cleanupCamera();
+      stopTracks();
     };
-  }, [isOpen, initCamera, cleanupCamera]);
+  }, [isOpen, initCamera, stopTracks]);
 
   const captureImage = () => {
-    if (!videoRef.current || !canvasRef.current || !stream) return;
+    if (!videoRef.current || !canvasRef.current || !streamRef.current) return;
     try {
       setCapturing(true);
       const video = videoRef.current;
@@ -118,7 +117,7 @@ export default function CameraWireframeModal({
             onImageCapture(blob);
           }
           setCapturing(false);
-          cleanupCamera();
+          stopTracks();
           onClose();
         },
         'image/webp',
@@ -130,24 +129,22 @@ export default function CameraWireframeModal({
     }
   };
 
-  const handleNativeCameraFallback = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFallbackFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       onImageCapture(file);
-      cleanupCamera();
+      stopTracks();
       onClose();
     }
   };
 
   if (!isOpen) return null;
 
-  // Realistic Car Silhouette Vector Overlays
   const renderCarSilhouette = () => {
     switch (slotKey) {
       case 'front_three_quarter':
         return (
-          <svg className="w-full h-full max-h-[80vh] text-white/80 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
-            {/* Front 3/4 Perspective Silhouette */}
+          <svg className="w-full h-full max-h-[75vh] text-white/80 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
             <path strokeWidth="3" strokeDasharray="8 6" d="
               M 110,340 
               C 120,320 150,305 180,305 
@@ -164,13 +161,10 @@ export default function CameraWireframeModal({
               C 130,240 90,270 85,305 
               C 80,335 95,340 110,340 Z
             " />
-            {/* Wheels & Arches */}
             <circle cx="180" cy="355" r="50" strokeWidth="3.5" strokeDasharray="6 4" />
             <circle cx="635" cy="340" r="45" strokeWidth="3.5" strokeDasharray="6 4" />
-            {/* Windshield & Greenhouse Pillar */}
             <path strokeWidth="2.5" strokeDasharray="5 5" d="M 300,140 L 470,140 L 450,230 L 220,230 Z" />
             <path strokeWidth="2" strokeDasharray="4 4" d="M 320,140 L 305,230" />
-            {/* Headlights & Grille alignment guide */}
             <path strokeWidth="2" strokeDasharray="4 4" d="M 110,285 C 140,280 180,275 220,270" />
             <text x="50%" y="60" fill="currentColor" textAnchor="middle" fontSize="18" fontWeight="bold" letterSpacing="1">
               ALIGN FRONT 3/4 (DRIVER + HOOD)
@@ -180,8 +174,7 @@ export default function CameraWireframeModal({
 
       case 'rear_three_quarter':
         return (
-          <svg className="w-full h-full max-h-[80vh] text-white/80 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
-            {/* Rear 3/4 Perspective Silhouette */}
+          <svg className="w-full h-full max-h-[75vh] text-white/80 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
             <path strokeWidth="3" strokeDasharray="8 6" d="
               M 700,340 
               C 690,320 660,305 630,305 
@@ -209,8 +202,7 @@ export default function CameraWireframeModal({
 
       case 'side_profile':
         return (
-          <svg className="w-full h-full max-h-[80vh] text-white/80 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
-            {/* Level Ground Side Silhouette */}
+          <svg className="w-full h-full max-h-[75vh] text-white/80 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
             <path strokeWidth="3" strokeDasharray="8 6" d="
               M 60,360 
               L 120,360 
@@ -228,10 +220,8 @@ export default function CameraWireframeModal({
               L 70,240 
               C 40,265 40,320 60,360 Z
             " />
-            {/* Wheels */}
             <circle cx="240" cy="355" r="55" strokeWidth="3.5" strokeDasharray="6 4" />
             <circle cx="660" cy="355" r="55" strokeWidth="3.5" strokeDasharray="6 4" />
-            {/* Windows / Pillars */}
             <path strokeWidth="2.5" strokeDasharray="5 5" d="M 270,125 L 440,125 L 530,205 L 185,205 Z" />
             <line x1="365" y1="125" x2="365" y2="205" strokeWidth="2" strokeDasharray="4 4" />
             <text x="50%" y="60" fill="currentColor" textAnchor="middle" fontSize="18" fontWeight="bold" letterSpacing="1">
@@ -242,13 +232,11 @@ export default function CameraWireframeModal({
 
       case 'interior_dash':
         return (
-          <svg className="w-full h-full max-h-[80vh] text-white/80 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
-            {/* Steering Wheel Oval & Hub */}
+          <svg className="w-full h-full max-h-[75vh] text-white/80 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
             <ellipse cx="260" cy="300" rx="100" ry="115" strokeWidth="3.5" strokeDasharray="8 6" />
             <circle cx="260" cy="300" r="35" strokeWidth="2" strokeDasharray="4 4" />
             <line x1="160" y1="300" x2="225" y2="300" strokeWidth="2.5" strokeDasharray="4 4" />
             <line x1="295" y1="300" x2="360" y2="300" strokeWidth="2.5" strokeDasharray="4 4" />
-            {/* Center Console Screen & Dashboard Contour */}
             <rect x="420" y="210" width="220" height="150" rx="14" strokeWidth="3" strokeDasharray="6 4" />
             <path strokeWidth="2.5" strokeDasharray="6 4" d="M 80,240 C 200,210 380,180 720,200" />
             <text x="50%" y="60" fill="currentColor" textAnchor="middle" fontSize="18" fontWeight="bold" letterSpacing="1">
@@ -260,8 +248,7 @@ export default function CameraWireframeModal({
       case 'odometer':
       default:
         return (
-          <svg className="w-full h-full max-h-[80vh] text-white/80 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
-            {/* Cluster Display Housing & Gauges */}
+          <svg className="w-full h-full max-h-[75vh] text-white/80 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" viewBox="0 0 800 500" fill="none" stroke="currentColor">
             <rect x="160" y="140" width="480" height="240" rx="28" strokeWidth="3.5" strokeDasharray="8 6" />
             <circle cx="280" cy="260" r="65" strokeWidth="2" strokeDasharray="4 4" />
             <circle cx="520" cy="260" r="65" strokeWidth="2" strokeDasharray="4 4" />
@@ -284,7 +271,7 @@ export default function CameraWireframeModal({
         <button
           type="button"
           onClick={() => {
-            cleanupCamera();
+            stopTracks();
             onClose();
           }}
           className="text-white p-2 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 transition"
@@ -303,7 +290,7 @@ export default function CameraWireframeModal({
         ) : error ? (
           <div className="text-center p-6 bg-slate-900/90 border border-slate-700 rounded-3xl max-w-sm mx-4 text-slate-200 shadow-2xl">
             <CameraOff className="w-10 h-10 mx-auto mb-3 text-amber-400" />
-            <h3 className="text-sm font-bold text-white mb-1">Camera Stream Unavailable</h3>
+            <h3 className="text-sm font-bold text-white mb-1">Camera Unavailable</h3>
             <p className="text-xs text-slate-400 mb-5 leading-relaxed">{error}</p>
             
             <div className="flex flex-col gap-2">
@@ -312,7 +299,7 @@ export default function CameraWireframeModal({
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full bg-[#e03a14] hover:bg-[#c53210] text-white py-3 rounded-xl font-bold text-xs shadow-md transition"
               >
-                Open Device Camera App
+                Take Photo with Device App
               </button>
               <button
                 type="button"
@@ -329,7 +316,7 @@ export default function CameraWireframeModal({
               accept="image/*"
               capture="environment"
               className="hidden"
-              onChange={handleNativeCameraFallback}
+              onChange={handleFallbackFile}
             />
           </div>
         ) : (
@@ -341,7 +328,6 @@ export default function CameraWireframeModal({
               muted
               className="absolute inset-0 w-full h-full object-cover"
             />
-            {/* Wireframe Silhouette Overlay */}
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-4">
               {renderCarSilhouette()}
             </div>
@@ -352,7 +338,7 @@ export default function CameraWireframeModal({
 
       {/* Bottom Controls */}
       <div className="p-6 flex items-center justify-center bg-gradient-to-t from-black/90 via-black/50 to-transparent z-20">
-        {!error && !isInitializing && (
+        {hasStream && !error && !isInitializing && (
           <button
             type="button"
             disabled={capturing}
