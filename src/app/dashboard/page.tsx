@@ -48,17 +48,22 @@ export default function DashboardPage() {
 
     if (listings) setMyListings(listings);
 
-    // 2. Fetch user's saved listings
+    // 2. Fetch user's saved listings IDs first, then get cars
     const { data: savedRows } = await supabase
       .from('saved_listings')
-      .select('listing_id, listings(*)')
+      .select('listing_id')
       .eq('user_id', user.id);
 
-    if (savedRows) {
-      const flattened = savedRows
-        .map((r: any) => r.listings)
-        .filter(Boolean);
-      setSavedListings(flattened);
+    if (savedRows && savedRows.length > 0) {
+      const ids = savedRows.map((r: any) => r.listing_id);
+      const { data: cars } = await supabase
+        .from('listings')
+        .select('*')
+        .in('id', ids);
+
+      if (cars) setSavedListings(cars);
+    } else {
+      setSavedListings([]);
     }
 
     setLoading(false);
@@ -133,7 +138,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Tab Switcher */}
+        {/* Tabs */}
         <div className="flex gap-2 border-b border-slate-200 mb-6 pb-2">
           <button
             onClick={() => setActiveTab('listings')}

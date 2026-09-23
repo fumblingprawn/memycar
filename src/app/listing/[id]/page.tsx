@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -12,9 +12,9 @@ import {
   Cog, 
   Calendar, 
   Wrench, 
-  ShieldAlert,
-  ShieldCheck,
-  Zap,
+  ShieldAlert, 
+  ShieldCheck, 
+  Zap, 
   ChevronLeft, 
   ChevronRight, 
   Maximize2, 
@@ -33,22 +33,43 @@ export default function ListingDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
-  const [isZoomed, setIsZoomed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
 
+  // Description translation
   const [isTranslating, setIsTranslating] = useState(false);
   const [showTranslated, setShowTranslated] = useState(false);
   const [translatedDescription, setTranslatedDescription] = useState<string | null>(null);
 
+  const listingId = params?.id as string;
+
+  // Check if listing is already saved by the current user
+  const checkSavedStatus = useCallback(async () => {
+    if (!listingId) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from('saved_listings')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('listing_id', listingId)
+      .maybeSingle();
+
+    if (data) {
+      setSaved(true);
+    }
+  }, [listingId, supabase]);
+
   useEffect(() => {
     async function fetchListing() {
-      if (!params?.id) return;
+      if (!listingId) return;
       try {
         const { data, error } = await supabase
           .from('listings')
           .select('*')
-          .eq('id', params.id)
+          .eq('id', listingId)
           .single();
 
         if (error) throw error;
@@ -59,20 +80,54 @@ export default function ListingDetailPage() {
         setLoading(false);
       }
     }
+
     fetchListing();
-  }, [params?.id, supabase]);
+    checkSavedStatus();
+  }, [listingId, supabase, checkSavedStatus]);
+
+  // Real Database Save / Unsave
+  const handleToggleSave = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      router.push('/auth');
+      return;
+    }
+
+    setSaveLoading(true);
+    try {
+      if (saved) {
+        setSaved(false);
+        await supabase
+          .from('saved_listings')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('listing_id', listingId);
+      } else {
+        setSaved(true);
+        await supabase
+          .from('saved_listings')
+          .insert({
+            user_id: user.id,
+            listing_id: listingId,
+          });
+      }
+    } catch (err) {
+      console.error('Error updating saved listing:', err);
+      setSaved(!saved); // revert on error
+    } finally {
+      setSaveLoading(false);
+    }
+  };
 
   const handleToggleTranslate = async () => {
     if (showTranslated) {
       setShowTranslated(false);
       return;
     }
-
     if (translatedDescription) {
       setShowTranslated(true);
       return;
     }
-
     if (!listing?.description) return;
 
     setIsTranslating(true);
@@ -89,13 +144,12 @@ export default function ListingDetailPage() {
 
       if (!res.ok) throw new Error('Translation failed');
       const data = await res.json();
-
       if (data.translatedText) {
         setTranslatedDescription(data.translatedText);
         setShowTranslated(true);
       }
     } catch (err) {
-      console.error('Failed to translate listing description:', err);
+      console.error('Failed to translate description:', err);
     } finally {
       setIsTranslating(false);
     }
@@ -104,12 +158,7 @@ export default function ListingDetailPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f4f4f4] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#e03a14] border-t-transparent mx-auto mb-3"></div>
-          <p className="text-sm font-semibold text-slate-600">
-            {isAr ? 'جاري تحميل تفاصيل السيارة...' : 'Loading car details...'}
-          </p>
-        </div>
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#e03a14] border-t-transparent mx-auto mb-3"></div>
       </div>
     );
   }
@@ -189,10 +238,7 @@ export default function ListingDetailPage() {
                   <img
                     src={activeImage}
                     alt={listing.title || `${listing.make} ${listing.model}`}
-                    onClick={() => {
-                      setIsLightboxOpen(true);
-                      setIsZoomed(false);
-                    }}
+                    onClick={() => setIsLightboxOpen(true)}
                     className="w-full h-full object-contain cursor-zoom-in"
                   />
 
@@ -319,16 +365,20 @@ export default function ListingDetailPage() {
                 </button>
               )}
 
+              {/* Functional Save Button */}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <button
                   type="button"
-                  onClick={() => setSaved(!saved)}
+                  disabled={saveLoading}
+                  onClick={handleToggleSave}
                   className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition ${
-                    saved ? 'border-[#e03a14] text-[#e03a14] bg-orange-50' : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                    saved
+                      ? 'border-[#e03a14] text-[#e03a14] bg-orange-50 font-black'
+                      : 'border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
                 >
-                  <Bookmark className="w-3.5 h-3.5" />
-                  {saved ? t('saved') : t('save')}
+                  <Bookmark className={`w-3.5 h-3.5 ${saved ? 'fill-[#e03a14]' : ''}`} />
+                  {saved ? (isAr ? 'تم الحفظ' : 'Saved') : (isAr ? 'حفظ' : 'Save')}
                 </button>
                 <button
                   type="button"
@@ -355,13 +405,12 @@ export default function ListingDetailPage() {
             {t('inspectNotice')}
           </div>
 
-          {/* KEY VEHICLE DETAILS GRID */}
+          {/* KEY VEHICLE DETAILS */}
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-5">
               {t('keyDetails')}
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
-              {/* Mileage */}
               <div className="flex items-start gap-3">
                 <Gauge className="w-5 h-5 text-slate-400 mt-0.5" />
                 <div>
@@ -370,7 +419,6 @@ export default function ListingDetailPage() {
                 </div>
               </div>
 
-              {/* Specs */}
               <div className="flex items-start gap-3">
                 <Globe className="w-5 h-5 text-slate-400 mt-0.5" />
                 <div>
@@ -379,7 +427,6 @@ export default function ListingDetailPage() {
                 </div>
               </div>
 
-              {/* Fuel Type */}
               <div className="flex items-start gap-3">
                 <Fuel className="w-5 h-5 text-slate-400 mt-0.5" />
                 <div>
@@ -388,7 +435,6 @@ export default function ListingDetailPage() {
                 </div>
               </div>
 
-              {/* Transmission */}
               <div className="flex items-start gap-3">
                 <Cog className="w-5 h-5 text-slate-400 mt-0.5" />
                 <div>
@@ -397,7 +443,6 @@ export default function ListingDetailPage() {
                 </div>
               </div>
 
-              {/* Year */}
               <div className="flex items-start gap-3">
                 <Calendar className="w-5 h-5 text-slate-400 mt-0.5" />
                 <div>
@@ -406,7 +451,6 @@ export default function ListingDetailPage() {
                 </div>
               </div>
 
-              {/* Accident History */}
               <div className="flex items-start gap-3">
                 <ShieldAlert className="w-5 h-5 text-slate-400 mt-0.5" />
                 <div>
@@ -415,7 +459,6 @@ export default function ListingDetailPage() {
                 </div>
               </div>
 
-              {/* Warranty */}
               <div className="flex items-start gap-3">
                 <ShieldCheck className="w-5 h-5 text-slate-400 mt-0.5" />
                 <div>
@@ -424,7 +467,6 @@ export default function ListingDetailPage() {
                 </div>
               </div>
 
-              {/* Horsepower */}
               {horsepower && (
                 <div className="flex items-start gap-3">
                   <Zap className="w-5 h-5 text-slate-400 mt-0.5" />
@@ -435,7 +477,6 @@ export default function ListingDetailPage() {
                 </div>
               )}
 
-              {/* Service History */}
               <div className="flex items-start gap-3">
                 <Wrench className="w-5 h-5 text-slate-400 mt-0.5" />
                 <div>
@@ -469,7 +510,7 @@ export default function ListingDetailPage() {
             )}
           </div>
 
-          {/* Description Block */}
+          {/* Description */}
           {listing.description && (
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
               <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
