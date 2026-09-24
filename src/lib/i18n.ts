@@ -1,6 +1,16 @@
 export type Locale = 'en' | 'ar';
 
 export const DICTIONARY: Record<string, { en: string; ar: string }> = {
+  // Placeholders & Location
+  "selectFuelPlaceholder": { en: "Fuel type", ar: "نوع الوقود" },
+  "selectServiceContractPlaceholder": { en: "Service Contract Status", ar: "حالة عقد الصيانة" },
+  "locationHeading": { en: "Vehicle Location", ar: "موقع تواجد المركبة" },
+  "photoGuideTitle": { en: "Recommended Vehicle Angles", ar: "زوايا التصوير الموصى بها" },
+  "angleFront": { en: "Front 3/4", ar: "الأمام ٣/٤" },
+  "angleRear": { en: "Rear 3/4", ar: "الخلف ٣/٤" },
+  "angleSide": { en: "Side Profile", ar: "جانبي كامل" },
+  "angleInterior": { en: "Dashboard", ar: "المقصورة والعدادات" },
+
   // Sell form adjustments
   "serviceContract": { en: "Service Contract", ar: "عقد صيانة" },
   "yes": { en: "Yes", ar: "نعم" },

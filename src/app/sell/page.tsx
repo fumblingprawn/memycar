@@ -11,7 +11,9 @@ import {
   X, 
   AlertCircle, 
   Loader2, 
-  ArrowLeft
+  ArrowLeft,
+  MapPin,
+  Camera
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -23,7 +25,7 @@ export default function SellPage() {
   const [user, setUser] = useState<any>(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
-  // Form Fields - None preselected
+  // Form Fields - clean initial states
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
   const [trim, setTrim] = useState('');
@@ -31,11 +33,11 @@ export default function SellPage() {
   const [price, setPrice] = useState<string>('');
   const [mileage, setMileage] = useState<string>('');
   const [specs, setSpecs] = useState('');
-  const [city, setCity] = useState('');
   const [fuelType, setFuelType] = useState('');
   const [transmission, setTransmission] = useState('');
   const [warranty, setWarranty] = useState('');
   const [serviceContract, setServiceContract] = useState('');
+  const [city, setCity] = useState('');
   const [description, setDescription] = useState('');
 
   // Media & Submission State
@@ -97,9 +99,8 @@ export default function SellPage() {
     if (!user) return;
     setErrorMsg(null);
 
-    // Validation checks for explicit selection
     if (!make || !model || !year || !price || !mileage || !specs || !city || !fuelType || !transmission || !warranty || !serviceContract) {
-      setErrorMsg(isAr ? 'يرجى ملء واختيار كافة الحقول المطلوبة' : 'Please complete all required fields');
+      setErrorMsg(isAr ? 'يرجى ملء كافة الحقول المطلوبة' : 'Please complete all required fields');
       return;
     }
 
@@ -193,7 +194,7 @@ export default function SellPage() {
               </h1>
               <p className="text-xs text-slate-500 mt-1">
                 {isAr
-                  ? 'أدخل بيانات سيارتك بدقة لعرضها على المشترين في كافة أنحاء الإمارات'
+                  ? 'أدخل مواصفات سيارتك بدقة لعرضها على المشترين في كافة أنحاء الإمارات'
                   : 'Enter your car specifications to reach verified buyers across the UAE'}
               </p>
             </div>
@@ -326,13 +327,13 @@ export default function SellPage() {
               </div>
             </div>
 
-            {/* 2. REGIONAL SPECS & TECHNICAL SPECS */}
+            {/* 2. TECHNICAL SPECIFICATIONS */}
             <div className="space-y-4 pt-4 border-t border-slate-100">
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                {isAr ? 'المواصفات الفنية والإقليمية' : 'Specs & Details'}
+                {isAr ? 'المواصفات الفنية للسيارة' : 'Car Specifications'}
               </h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* Regional Specs */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
@@ -353,25 +354,7 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* Emirate / City */}
-                <div>
-                  <label className="text-xs font-bold text-slate-900 block mb-1.5">
-                    {t('emirate')} *
-                  </label>
-                  <select
-                    required
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
-                  >
-                    <option value="">{t('selectEmirate')}</option>
-                    {emirates.map((em) => (
-                      <option key={em} value={em}>{t(em)}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Fuel Type */}
+                {/* Fuel Type (Placeholder: Fuel type) */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
                     {t('fuelType')} *
@@ -382,7 +365,7 @@ export default function SellPage() {
                     onChange={(e) => setFuelType(e.target.value)}
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
                   >
-                    <option value="">{t('selectFuel')}</option>
+                    <option value="">{t('selectFuelPlaceholder')}</option>
                     {fuelList.map((f) => (
                       <option key={f} value={f}>{t(f)}</option>
                     ))}
@@ -409,7 +392,7 @@ export default function SellPage() {
               </div>
 
               {/* Warranty & Service Contract */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                 {/* Warranty */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
@@ -427,7 +410,7 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* Service Contract */}
+                {/* Service Contract (Placeholder: Service Contract Status) */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
                     {isAr ? 'عقد صيانة (Service Contract) *' : 'Service Contract *'}
@@ -438,7 +421,7 @@ export default function SellPage() {
                     onChange={(e) => setServiceContract(e.target.value)}
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
                   >
-                    <option value="">{t('selectServiceContract')}</option>
+                    <option value="">{t('selectServiceContractPlaceholder')}</option>
                     <option value="Yes">{isAr ? 'نعم (يوجد عقد صيانة)' : 'Yes'}</option>
                     <option value="No">{isAr ? 'لا (بدون عقد صيانة)' : 'No'}</option>
                   </select>
@@ -446,7 +429,31 @@ export default function SellPage() {
               </div>
             </div>
 
-            {/* 3. DESCRIPTION */}
+            {/* 3. LOCATION & CONTACT (Moved cleanly outside specs) */}
+            <div className="space-y-3 pt-4 border-t border-slate-100">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-[#e03a14]" />
+                {t('locationHeading')}
+              </h2>
+              <div>
+                <label className="text-xs font-bold text-slate-900 block mb-1.5">
+                  {t('emirate')} *
+                </label>
+                <select
+                  required
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
+                >
+                  <option value="">{t('selectEmirate')}</option>
+                  {emirates.map((em) => (
+                    <option key={em} value={em}>{t(em)}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* 4. DESCRIPTION */}
             <div className="space-y-2 pt-4 border-t border-slate-100">
               <label className="text-xs font-bold text-slate-900 block">
                 {t('vehicleDescription')}
@@ -460,12 +467,53 @@ export default function SellPage() {
               />
             </div>
 
-            {/* 4. PHOTO UPLOADS */}
-            <div className="space-y-3 pt-4 border-t border-slate-100">
-              <label className="text-xs font-bold text-slate-900 block">
-                {isAr ? 'صور السيارة (حتى ١٥ صورة) *' : 'Vehicle Photos (Max 15) *'}
-              </label>
+            {/* 5. WIREFRAME ANGLE GUIDE & PHOTO UPLOADS */}
+            <div className="space-y-4 pt-4 border-t border-slate-100">
+              <div>
+                <label className="text-xs font-bold text-slate-900 block">
+                  {isAr ? 'صور السيارة (حتى ١٥ صورة) *' : 'Vehicle Photos (Max 15) *'}
+                </label>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {isAr ? 'التقط صوراً واضحة للسيارة لزيادة عدد المشترين وثقتهم' : 'Follow the framing guide below to capture clean, high-converting photos'}
+                </p>
+              </div>
 
+              {/* Visual Wireframe Guides */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                <div className="border border-dashed border-slate-300 rounded-xl p-2.5 text-center bg-white">
+                  <div className="w-7 h-7 mx-auto rounded-lg bg-orange-50 text-[#e03a14] flex items-center justify-center mb-1">
+                    <Camera className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-700 block">{t('angleFront')}</span>
+                  <span className="text-[9px] text-slate-400">45° Angle</span>
+                </div>
+
+                <div className="border border-dashed border-slate-300 rounded-xl p-2.5 text-center bg-white">
+                  <div className="w-7 h-7 mx-auto rounded-lg bg-orange-50 text-[#e03a14] flex items-center justify-center mb-1">
+                    <Camera className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-700 block">{t('angleRear')}</span>
+                  <span className="text-[9px] text-slate-400">45° Angle</span>
+                </div>
+
+                <div className="border border-dashed border-slate-300 rounded-xl p-2.5 text-center bg-white">
+                  <div className="w-7 h-7 mx-auto rounded-lg bg-orange-50 text-[#e03a14] flex items-center justify-center mb-1">
+                    <Camera className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-700 block">{t('angleSide')}</span>
+                  <span className="text-[9px] text-slate-400">Profile View</span>
+                </div>
+
+                <div className="border border-dashed border-slate-300 rounded-xl p-2.5 text-center bg-white">
+                  <div className="w-7 h-7 mx-auto rounded-lg bg-orange-50 text-[#e03a14] flex items-center justify-center mb-1">
+                    <Camera className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-700 block">{t('angleInterior')}</span>
+                  <span className="text-[9px] text-slate-400">Cockpit View</span>
+                </div>
+              </div>
+
+              {/* Upload Grid */}
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                 {imagePreviews.map((src, idx) => (
                   <div key={idx} className="relative aspect-video rounded-xl overflow-hidden border border-slate-200 group bg-slate-100">
