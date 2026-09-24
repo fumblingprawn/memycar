@@ -229,10 +229,18 @@ export default function AuthPage() {
                     placeholder="50 123 4567"
                     value={phone}
                     onChange={(e) => {
-                      let val = e.target.value.replace(/\D/g, '');
-                      if (val.startsWith('971')) val = val.slice(3);
-                      if (val.startsWith('0')) val = val.slice(1);
-                      setPhone(val.slice(0, 9));
+                      let raw = e.target.value.replace(/\D/g, '');
+                      // Strip international UAE prefixes (00971 or 971)
+                      if (raw.startsWith('00971')) {
+                        raw = raw.slice(5);
+                      } else if (raw.startsWith('971')) {
+                        raw = raw.slice(3);
+                      }
+                      // Strip local leading 0 (e.g. 050 -> 50)
+                      if (raw.startsWith('0')) {
+                        raw = raw.slice(1);
+                      }
+                      setPhone(raw.slice(0, 9));
                     }}
                     className="w-full px-3 py-2.5 text-sm outline-none font-mono bg-transparent tracking-wide text-slate-900"
                   />
