@@ -1,6 +1,11 @@
 export type Locale = 'en' | 'ar';
 
 export const DICTIONARY: Record<string, { en: string; ar: string }> = {
+  // Toast Notifications & Links
+  "newMessageReceived": { en: "New message received", ar: "وصلتك رسالة جديدة" },
+  "viewVehicleDetails": { en: "View Vehicle Details", ar: "عرض صفحة السيارة" },
+  "backToListing": { en: "Open Listing", ar: "فتح الإعلان" },
+
   // Chat Media & Realtime
   "attachImage": { en: "Attach Image", ar: "إرفاق صورة" },
   "uploadingImage": { en: "Uploading image...", ar: "جاري رفع الصورة..." },

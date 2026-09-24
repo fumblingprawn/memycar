@@ -23,9 +23,18 @@ import {
   MessageSquare,
   Send,
   Paperclip,
-  Image as ImageIcon,
-  X
+  X,
+  BellRing,
+  ArrowRight
 } from 'lucide-react';
+
+interface ToastNotice {
+  id: string;
+  convId: string;
+  carTitle: string;
+  carImage: string;
+  snippet: string;
+}
 
 function DashboardContent() {
   const router = useRouter();
@@ -59,6 +68,10 @@ function DashboardContent() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Sliding Notification Toast State
+  const [toast, setToast] = useState<ToastNotice | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -143,7 +156,51 @@ function DashboardContent() {
     fetchUserData();
   }, [fetchUserData]);
 
-  // Real-time Chat Subscription (WebSocket)
+  // Global Realtime listener for incoming messages to trigger sliding notifications
+  useEffect(() => {
+    if (!user) return;
+
+    const globalChannel = supabase
+      .channel('global_user_messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+        },
+        async (payload) => {
+          // If message is from someone else
+          if (payload.new.sender_id !== user.id) {
+            // Find related conversation
+            const targetConv = conversations.find((c) => c.id === payload.new.conversation_id);
+            const car = Array.isArray(targetConv?.listings) ? targetConv.listings[0] : targetConv?.listings;
+            const carTitle = car ? `${car.year} ${car.make} ${car.model}` : 'Vehicle Inquiry';
+            const carImg = car?.image_urls?.[0] || '/placeholder-car.jpg';
+
+            setToast({
+              id: payload.new.id,
+              convId: payload.new.conversation_id,
+              carTitle,
+              carImage: carImg,
+              snippet: payload.new.content || (isAr ? 'أرسل صورة' : 'Sent an image'),
+            });
+
+            // Auto-hide toast after 5.5 seconds
+            setTimeout(() => {
+              setToast((curr) => (curr?.id === payload.new.id ? null : curr));
+            }, 5500);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(globalChannel);
+    };
+  }, [user, conversations, supabase, isAr]);
+
+  // Active chat real-time listener for current selected conversation
   useEffect(() => {
     if (!selectedConv) return;
 
@@ -156,15 +213,14 @@ function DashboardContent() {
 
       if (data) {
         setMessages(data);
-        setTimeout(scrollToBottom, 100);
+        setTimeout(scrollToBottom, 80);
       }
     }
 
     loadMessages();
 
-    // Setup active WebSocket channel for instant incoming messages
     const channel = supabase
-      .channel(`realtime_chat_${selectedConv.id}`)
+      .channel(`active_chat_${selectedConv.id}`)
       .on(
         'postgres_changes',
         { 
@@ -175,11 +231,10 @@ function DashboardContent() {
         },
         (payload) => {
           setMessages((prev) => {
-            // Avoid duplicates from optimistic updates
             if (prev.some((m) => m.id === payload.new.id)) return prev;
             return [...prev, payload.new];
           });
-          setTimeout(scrollToBottom, 100);
+          setTimeout(scrollToBottom, 80);
         }
       )
       .subscribe();
@@ -215,7 +270,6 @@ function DashboardContent() {
     let uploadedImageUrl: string | null = null;
 
     try {
-      // 1. If an image is attached, upload to Supabase Storage
       if (selectedFile) {
         setUploadingImage(true);
         const fileExt = selectedFile.name.split('.').pop() || 'jpg';
@@ -228,9 +282,7 @@ function DashboardContent() {
             upsert: false
           });
 
-        if (uploadErr) {
-          console.warn('Storage upload error, falling back:', uploadErr);
-        } else {
+        if (!uploadErr) {
           const { data: publicUrlData } = supabase.storage
             .from('chat-attachments')
             .getPublicUrl(fileName);
@@ -240,7 +292,6 @@ function DashboardContent() {
         setUploadingImage(false);
       }
 
-      // Optimistic message placeholder
       const tempId = `temp_${Date.now()}`;
       const optimisticMsg = {
         id: tempId,
@@ -253,7 +304,6 @@ function DashboardContent() {
       setMessages((prev) => [...prev, optimisticMsg]);
       setTimeout(scrollToBottom, 50);
 
-      // 2. Insert to Supabase Messages
       const { data: inserted, error: msgErr } = await supabase
         .from('messages')
         .insert({
@@ -267,12 +317,10 @@ function DashboardContent() {
 
       if (msgErr) throw msgErr;
 
-      // Replace optimistic message with confirmed row
       if (inserted) {
         setMessages((prev) => prev.map((m) => (m.id === tempId ? inserted : m)));
       }
 
-      // 3. Update parent conversation last message
       const summaryText = text || (isAr ? '📷 أرسل صورة' : '📷 Sent a photo');
       await supabase
         .from('conversations')
@@ -282,7 +330,6 @@ function DashboardContent() {
         })
         .eq('id', selectedConv.id);
 
-      // Update sidebar summary immediately
       setConversations((prev) =>
         prev.map((c) =>
           c.id === selectedConv.id
@@ -290,7 +337,6 @@ function DashboardContent() {
             : c
         )
       );
-
     } catch (err) {
       console.error('Failed to send message:', err);
     } finally {
@@ -405,8 +451,54 @@ function DashboardContent() {
     );
   }
 
+  // Resolve active conversation car details reliably
+  const selectedCar = Array.isArray(selectedConv?.listings) ? selectedConv.listings[0] : selectedConv?.listings;
+  const targetListingId = selectedConv?.listing_id || selectedCar?.id;
+
   return (
-    <div className="min-h-[85vh] bg-[#f8f9fa] py-8">
+    <div className="min-h-[85vh] bg-[#f8f9fa] py-8 relative">
+      {/* Sliding In-App Notification Toast */}
+      {toast && (
+        <div className="fixed top-5 right-5 z-50 max-w-sm w-full bg-white rounded-2xl border-2 border-[#e03a14] p-4 shadow-2xl animate-in slide-in-from-top-5 duration-300">
+          <div className="flex items-start gap-3">
+            <div className="w-12 h-12 rounded-xl bg-slate-900 overflow-hidden flex-shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={toast.carImage} alt="" className="w-full h-full object-cover" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-1 mb-0.5">
+                <span className="text-[11px] font-black text-[#e03a14] flex items-center gap-1">
+                  <BellRing className="w-3 h-3" />
+                  {t('newMessageReceived')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setToast(null)}
+                  className="text-slate-400 hover:text-slate-700 p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <h5 className="text-xs font-bold text-slate-900 truncate">{toast.carTitle}</h5>
+              <p className="text-[11px] text-slate-500 line-clamp-1">{toast.snippet}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('messages');
+                  const found = conversations.find((c) => c.id === toast.convId);
+                  if (found) setSelectedConv(found);
+                  setToast(null);
+                }}
+                className="mt-1.5 text-[11px] font-bold text-[#e03a14] hover:underline flex items-center gap-1"
+              >
+                {isAr ? 'فتح المحادثة' : 'Open Chat'}
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* User Card */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -617,7 +709,7 @@ function DashboardContent() {
                   </div>
                 ) : (
                   conversations.map((conv) => {
-                    const car = conv.listings;
+                    const car = Array.isArray(conv.listings) ? conv.listings[0] : conv.listings;
                     const isSelected = selectedConv?.id === conv.id;
                     return (
                       <button
@@ -655,25 +747,46 @@ function DashboardContent() {
             <div className="md:col-span-2 flex flex-col justify-between bg-white h-[580px]">
               {selectedConv ? (
                 <>
-                  {/* Top Bar */}
-                  <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <h4 className="text-xs font-black text-slate-900">
-                          {selectedConv.listings?.year} {selectedConv.listings?.make} {selectedConv.listings?.model}
-                        </h4>
-                        <span className="text-[11px] font-bold text-[#e03a14]">
-                          {formatPrice(selectedConv.listings?.price || 0)}
-                        </span>
-                      </div>
-                    </div>
-                    {selectedConv.listings?.id && (
+                  {/* Highly Visible & Clickable Vehicle Header */}
+                  <div className="p-3.5 sm:p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 gap-3">
+                    {targetListingId ? (
                       <Link
-                        href={`/listing/${selectedConv.listings.id}`}
-                        className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1 font-semibold"
+                        href={`/listing/${targetListingId}`}
+                        className="flex items-center gap-3 group hover:opacity-95 transition flex-1 min-w-0"
                       >
-                        <ExternalLink className="w-3 h-3" />
-                        {isAr ? 'عرض الإعلان' : 'View Listing'}
+                        <div className="w-11 h-11 rounded-xl bg-slate-900 overflow-hidden flex-shrink-0 border border-slate-200 group-hover:ring-2 group-hover:ring-[#e03a14] transition">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={selectedCar?.image_urls?.[0] || '/placeholder-car.jpg'}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate group-hover:text-[#e03a14] transition flex items-center gap-1.5">
+                            {selectedCar ? `${selectedCar.year} ${selectedCar.make} ${selectedCar.model}` : 'View Vehicle Listing'}
+                            <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#e03a14] flex-shrink-0" />
+                          </h4>
+                          <span className="text-xs font-black text-[#e03a14] block">
+                            {formatPrice(selectedCar?.price || 0)}
+                          </span>
+                        </div>
+                      </Link>
+                    ) : (
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-black text-slate-900 truncate">
+                          {selectedCar ? `${selectedCar.year} ${selectedCar.make} ${selectedCar.model}` : 'Vehicle Inquiry'}
+                        </h4>
+                      </div>
+                    )}
+
+                    {targetListingId && (
+                      <Link
+                        href={`/listing/${targetListingId}`}
+                        className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold py-2 px-3 rounded-xl transition flex items-center gap-1.5 shadow-2xs flex-shrink-0"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-[#e03a14]" />
+                        <span>{t('viewVehicleDetails')}</span>
                       </Link>
                     )}
                   </div>
@@ -694,7 +807,6 @@ function DashboardContent() {
                                 : 'bg-slate-100 text-slate-800 rounded-bl-xs'
                             }`}
                           >
-                            {/* Attached Image if exists */}
                             {m.image_url && (
                               <div className="rounded-xl overflow-hidden max-w-xs border border-white/20 bg-black/10">
                                 <a href={m.image_url} target="_blank" rel="noopener noreferrer">
@@ -722,7 +834,7 @@ function DashboardContent() {
                     <div ref={messagesEndRef} />
                   </div>
 
-                  {/* Attached Image Preview Bar */}
+                  {/* File Preview Bar */}
                   {filePreview && (
                     <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 flex items-center gap-3">
                       <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-slate-300">
@@ -742,9 +854,8 @@ function DashboardContent() {
                     </div>
                   )}
 
-                  {/* Send Form with File Attachment */}
+                  {/* Send Form */}
                   <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-100 flex items-center gap-2">
-                    {/* File Attachment Button */}
                     <input
                       type="file"
                       ref={fileInputRef}
@@ -926,7 +1037,7 @@ function DashboardContent() {
                 </button>
               )}
 
-              {/* Delete Account */}
+              {/* Danger Zone: Delete Account */}
               <div className="pt-6 border-t border-red-100">
                 <h4 className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">
                   {t('deleteAccount')}
