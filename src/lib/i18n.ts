@@ -1,6 +1,12 @@
 export type Locale = 'en' | 'ar';
 
 export const DICTIONARY: Record<string, { en: string; ar: string }> = {
+  // Sell form adjustments
+  "serviceContract": { en: "Service Contract", ar: "عقد صيانة" },
+  "yes": { en: "Yes", ar: "نعم" },
+  "no": { en: "No", ar: "لا" },
+  "otherSpecs": { en: "Other", ar: "أخرى" },
+
   // Toast Notifications & Links
   "newMessageReceived": { en: "New message received", ar: "وصلتك رسالة جديدة" },
   "viewVehicleDetails": { en: "View Vehicle Details", ar: "عرض صفحة السيارة" },
