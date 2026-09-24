@@ -37,6 +37,7 @@ export default function ListingDetailPage() {
   const { t, formatPrice, formatMileage, isAr, locale } = useLanguage();
 
   const [listing, setListing] = useState<any>(null);
+  const [sellerProfile, setSellerProfile] = useState<any>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
