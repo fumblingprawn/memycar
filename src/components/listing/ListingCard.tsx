@@ -111,7 +111,7 @@ export default function ListingCard({ listing }: { listing: Listing }) {
 
   return (
     <div className={`bg-white rounded-2xl border overflow-hidden shadow-xs hover:shadow-md transition flex flex-col justify-between group ${
-      isSold ? 'border-red-200 opacity-90' : 'border-slate-200'
+      isSold ? 'border-red-200 bg-slate-50/50' : 'border-slate-200'
     }`}>
       <div>
         {/* Cover Photo */}
@@ -121,7 +121,7 @@ export default function ListingCard({ listing }: { listing: Listing }) {
             src={coverImage}
             alt={`${make} ${model}`}
             className={`w-full h-full object-cover transition duration-300 ${
-              isSold ? 'grayscale-25 brightness-90' : 'group-hover:scale-105'
+              isSold ? 'grayscale-40 opacity-80' : 'group-hover:scale-105'
             }`}
           />
 
@@ -130,11 +130,13 @@ export default function ListingCard({ listing }: { listing: Listing }) {
             {t(specs)}
           </span>
 
-          {/* SOLD Badge or Year */}
+          {/* Prominent Center SOLD Watermark Badge */}
           {isSold ? (
-            <span className="absolute top-2.5 right-2.5 bg-red-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded shadow-md tracking-wider">
-              {t('sold')}
-            </span>
+            <div className="absolute inset-0 bg-black/35 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
+              <span className="bg-red-600/95 text-white font-black text-xs sm:text-sm tracking-widest px-4 py-1 rounded-lg border-2 border-white shadow-xl uppercase -rotate-6">
+                {t('sold')}
+              </span>
+            </div>
           ) : (
             <span className="absolute top-2.5 right-2.5 bg-white/90 text-slate-800 text-[10px] font-extrabold px-2 py-0.5 rounded">
               {listing.year}
@@ -159,11 +161,11 @@ export default function ListingCard({ listing }: { listing: Listing }) {
         <div className="p-4 space-y-2">
           {/* Price */}
           <div className="flex items-center justify-between">
-            <div className={`text-lg font-black ${isSold ? 'text-slate-500 line-through' : 'text-[#e03a14]'}`}>
+            <div className={`text-lg font-black ${isSold ? 'text-slate-400 line-through' : 'text-[#e03a14]'}`}>
               {formatPrice(price)}
             </div>
             {isSold && (
-              <span className="text-[10px] font-black text-red-600 uppercase bg-red-50 px-2 py-0.5 rounded">
+              <span className="text-[11px] font-black text-red-600 uppercase bg-red-100/80 px-2 py-0.5 rounded-md tracking-wider">
                 {t('sold')}
               </span>
             )}
@@ -194,12 +196,12 @@ export default function ListingCard({ listing }: { listing: Listing }) {
         </div>
       </div>
 
-      {/* Action Buttons: Completely disabled if SOLD */}
+      {/* Action Button: Clean, Bold SOLD pill */}
       <div className="p-4 pt-0 mt-2">
         {isSold ? (
-          <div className="w-full bg-slate-100 border border-slate-200 text-slate-500 py-2.5 px-3 rounded-xl text-xs font-black text-center flex items-center justify-center gap-1.5 uppercase tracking-wider">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>{t('sold')} — Contact Closed</span>
+          <div className="w-full bg-red-50 border border-red-200 text-red-700 py-2.5 px-3 rounded-xl text-xs font-black text-center uppercase tracking-wider shadow-2xs flex items-center justify-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-red-600" />
+            <span>{t('sold')}</span>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2">
