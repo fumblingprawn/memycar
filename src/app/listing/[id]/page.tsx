@@ -304,6 +304,13 @@ export default function ListingDetailPage() {
           </button>
         </div>
 
+        
+        {listing.status === "sold" && (
+          <div className="mb-6 p-4 bg-red-600 text-white rounded-2xl font-black text-sm text-center tracking-wide shadow-md">
+            ⚠️ {t("sold")} — {t("listingSoldNotice")}
+          </div>
+        )}
+  
         {/* Gallery & Sidebar */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start mb-8">
           <div className="lg:col-span-2 space-y-4">
@@ -440,7 +447,14 @@ export default function ListingDetailPage() {
                 <p className="text-xs text-slate-500 mt-0.5">{t(city)}, UAE</p>
               </div>
 
-              {/* Action 1: Call Button */}
+              
+              {listing.status === "sold" ? (
+                <div className="w-full bg-slate-100 border border-slate-300 text-slate-500 font-black py-3.5 px-4 rounded-xl text-center text-sm uppercase tracking-wider">
+                  ✓ {t("sold")}
+                </div>
+              ) : (
+                <>
+                  {/* Action 1: Call Button */}
               {phone ? (
                 <a
                   href={`tel:${phone}`}
@@ -474,6 +488,9 @@ export default function ListingDetailPage() {
                 <p className="text-[11px] text-red-600 text-center font-medium bg-red-50 p-2 rounded-lg">
                   {chatError}
                 </p>
+              )}
+
+              </>
               )}
 
               {/* Save & Share */}

@@ -1,6 +1,18 @@
 export type Locale = 'en' | 'ar';
 
 export const DICTIONARY: Record<string, { en: string; ar: string }> = {
+  // Sold & Bulk Uploader
+  "markAsSold": { en: "Mark as Sold", ar: "تحديد كمباعة" },
+  "reactivateListing": { en: "Reactivate Listing", ar: "إعادة تفعيل الإعلان" },
+  "sold": { en: "SOLD", ar: "تم البيع" },
+  "listingSoldNotice": { en: "This vehicle has been sold and is no longer available.", ar: "تم بيع هذه السيارة ولم تعد متوفرة." },
+  "bulkUploader": { en: "Dealer Bulk Upload", ar: "الرفع الجماعي للمعريض" },
+  "downloadTemplate": { en: "Download CSV Template", ar: "تحميل نموذج ملف الإكسل (CSV)" },
+  "uploadCsvFile": { en: "Upload Inventory CSV", ar: "رفع ملف السيارات (CSV)" },
+  "processingRows": { en: "Processing listings...", ar: "جاري معالجة الإعلانات..." },
+  "bulkUploadSuccess": { en: "Vehicles imported successfully!", ar: "تم استيراد السيارات بنجاح!" },
+  "importErrors": { en: "Import errors found", ar: "توجد أخطاء في بعض السطور" },
+
   // Placeholders & Location
   "selectFuelPlaceholder": { en: "Fuel type", ar: "نوع الوقود" },
   "selectServiceContractPlaceholder": { en: "Service Contract Status", ar: "حالة عقد الصيانة" },

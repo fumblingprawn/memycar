@@ -11,7 +11,8 @@ import {
   Bookmark, 
   User as UserIcon, 
   LogOut, 
-  PlusCircle, 
+  PlusCircle,
+  FileSpreadsheet, 
   Trash2, 
   ExternalLink,
   ShieldCheck,
@@ -396,6 +397,33 @@ function DashboardContent() {
     }
   };
 
+  
+  const handleToggleSold = async (listingId: string, currentStatus: string) => {
+    try {
+      const newStatus = currentStatus === "sold" ? "active" : "sold";
+      const rpcName = currentStatus === "sold" ? "reactivate_listing" : "mark_listing_as_sold";
+      
+      setMyListings((prev) =>
+        prev.map((c) => (c.id === listingId ? { ...c, status: newStatus } : c))
+      );
+
+      const { error } = await supabase.rpc(rpcName, { target_listing_id: listingId });
+      if (error) {
+        // Fallback standard update
+        await supabase
+          .from("listings")
+          .update({
+            status: newStatus,
+            sold_at: newStatus === "sold" ? new Date().toISOString() : null,
+          })
+          .eq("id", listingId);
+      }
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      fetchUserData();
+    }
+  };
+  
   const handleDeleteListing = async (listingId: string) => {
     if (!confirm(t('confirmDelete'))) return;
     try {
@@ -526,6 +554,15 @@ function DashboardContent() {
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
+            
+            <Link
+              href="/dashboard/bulk-upload"
+              className="flex-1 sm:flex-none justify-center bg-slate-900 hover:bg-black text-white text-xs font-bold py-2.5 px-3.5 rounded-xl flex items-center gap-1.5 transition shadow-2xs"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-[#e03a14]" />
+              {t("bulkUploader")}
+            </Link>
+  
             <Link
               href="/sell"
               className="flex-1 sm:flex-none justify-center bg-[#e03a14] hover:bg-[#c53210] text-white text-xs font-bold py-2.5 px-4 rounded-xl flex items-center gap-1.5 transition shadow-2xs"
@@ -623,9 +660,15 @@ function DashboardContent() {
                           alt={car.model}
                           className="w-full h-full object-cover"
                         />
-                        <span className="absolute top-2.5 left-2.5 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-2xs">
-                          {isAr ? 'إعلان نشط' : 'Active'}
-                        </span>
+                        {car.status === "sold" ? (
+                          <span className="absolute top-2.5 left-2.5 bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded shadow-2xs tracking-wider">
+                            {t("sold")}
+                          </span>
+                        ) : (
+                          <span className="absolute top-2.5 left-2.5 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-2xs">
+                            {isAr ? "إعلان نشط" : "Active"}
+                          </span>
+                        )}
                       </div>
                       <div className="p-4 space-y-1">
                         <div className="text-base font-black text-[#e03a14]">
@@ -641,6 +684,19 @@ function DashboardContent() {
                     </div>
 
                     <div className="p-4 pt-0 border-t border-slate-100 flex items-center justify-between gap-2 mt-2">
+                      
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSold(car.id, car.status)}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                          car.status === "sold"
+                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
+                            : "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                        }`}
+                      >
+                        {car.status === "sold" ? t("reactivateListing") : t("markAsSold")}
+                      </button>
+  
                       <Link
                         href={`/listing/${car.id}`}
                         className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-1 transition"
