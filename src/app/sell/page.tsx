@@ -254,7 +254,7 @@ export default function SellPage() {
     <div className="min-h-screen bg-[#f4f4f4] py-8">
       <div className="max-w-3xl mx-auto px-4">
         {/* Banner with Connected Account Details */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-slate-900">
           <div>
             <h1 className="text-2xl font-black text-slate-900">
               {isAr ? 'بيع سيارتك في الإمارات' : 'List Your Vehicle'}
@@ -265,7 +265,7 @@ export default function SellPage() {
           </div>
 
           {currentUser && (
-            <div className="bg-slate-50 border border-slate-200 py-2 px-3.5 rounded-xl text-xs flex items-center gap-2">
+            <div className="bg-slate-50 border border-slate-200 py-2 px-3.5 rounded-xl text-xs flex items-center gap-2 text-slate-900">
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
               <div>
                 <span className="font-bold text-slate-800 block">
@@ -285,7 +285,7 @@ export default function SellPage() {
 
         {/* Warning if phone is not configured yet */}
         {currentUser && !sellerPhoneExists && (
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-3 text-xs text-amber-900">
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-3 text-xs text-amber-900 text-slate-900">
             <div className="flex items-center gap-2.5">
               <PhoneCall className="w-4 h-4 text-amber-600 flex-shrink-0" />
               <span>
@@ -304,7 +304,7 @@ export default function SellPage() {
         )}
 
         {success ? (
-          <div className="bg-white rounded-2xl border border-emerald-200 p-8 shadow-sm text-center">
+          <div className="bg-white rounded-2xl border border-emerald-200 p-8 shadow-sm text-center text-slate-900">
             <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
             <h2 className="text-xl font-bold text-slate-900 mb-1">
               {isAr ? 'تم نشر الإعلان بنجاح!' : 'Vehicle Listed Successfully!'}
@@ -323,8 +323,8 @@ export default function SellPage() {
             )}
 
             {/* STEP 1: VEHICLE SPECIFICATIONS */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5">
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5 text-slate-900">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3 text-slate-900">
                 <Car className="w-4 h-4 text-[#e03a14]" />
                 <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
                   {t('step1')}
@@ -339,7 +339,7 @@ export default function SellPage() {
                     required
                     value={formData.make}
                     onChange={(e) => setFormData({ ...formData, make: e.target.value, model: '', custom_make: '', custom_model: '' })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white text-slate-900"
                   >
                     <option value="">{t('selectMake')}</option>
                     {carData.makes.map((item) => (
@@ -361,7 +361,7 @@ export default function SellPage() {
                       placeholder="e.g. Lucid, Rivian"
                       value={formData.custom_make}
                       onChange={(e) => setFormData({ ...formData, custom_make: e.target.value })}
-                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 text-slate-900"
                     />
                   </div>
                 )}
@@ -374,7 +374,7 @@ export default function SellPage() {
                     disabled={!formData.make}
                     value={formData.model}
                     onChange={(e) => setFormData({ ...formData, model: e.target.value, custom_model: '' })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white disabled:bg-slate-100"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white disabled:bg-slate-100 text-slate-900"
                   >
                     <option value="">{formData.make ? t('selectModel') : t('selectMakeFirst')}</option>
                     {availableModels.map((mod) => (
@@ -396,7 +396,7 @@ export default function SellPage() {
                       placeholder="e.g. Air Sapphire, ML500"
                       value={formData.custom_model}
                       onChange={(e) => setFormData({ ...formData, custom_model: e.target.value })}
-                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 text-slate-900"
                     />
                   </div>
                 )}
@@ -408,7 +408,7 @@ export default function SellPage() {
                     required
                     value={formData.year}
                     onChange={(e) => setFormData({ ...formData, year: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white text-slate-900"
                   >
                     <option value="">{t('selectYear')}</option>
                     {years.map((y) => (
@@ -425,7 +425,7 @@ export default function SellPage() {
                     placeholder="e.g. Carrera S, AMG, GTS"
                     value={formData.trim}
                     onChange={(e) => setFormData({ ...formData, trim: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 text-slate-900"
                   />
                 </div>
 
@@ -436,7 +436,7 @@ export default function SellPage() {
                     required
                     value={formData.transmission}
                     onChange={(e) => setFormData({ ...formData, transmission: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white text-slate-900"
                   >
                     <option value="">{t('selectTransmission')}</option>
                     <option value="Automatic">{t('Automatic')}</option>
@@ -451,7 +451,7 @@ export default function SellPage() {
                     required
                     value={formData.specs}
                     onChange={(e) => setFormData({ ...formData, specs: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white text-slate-900"
                   >
                     <option value="">{t('selectSpecs')}</option>
                     <option value="GCC Specs">{t('GCC Specs')}</option>
@@ -470,7 +470,7 @@ export default function SellPage() {
                     placeholder="e.g. 45000"
                     value={formData.mileage}
                     onChange={(e) => setFormData({ ...formData, mileage: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 text-slate-900"
                   />
                 </div>
 
@@ -483,7 +483,7 @@ export default function SellPage() {
                     placeholder="e.g. 175000"
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 text-slate-900"
                   />
                 </div>
 
@@ -494,7 +494,7 @@ export default function SellPage() {
                     required
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white text-slate-900"
                   >
                     <option value="">{t('selectEmirate')}</option>
                     {emirateOptions.map((em) => (
@@ -510,7 +510,7 @@ export default function SellPage() {
                     required
                     value={formData.accident_history}
                     onChange={(e) => setFormData({ ...formData, accident_history: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white text-slate-900"
                   >
                     <option value="">{t('selectAccident')}</option>
                     {accidentOptions.map((opt) => (
@@ -526,7 +526,7 @@ export default function SellPage() {
                     required
                     value={formData.warranty}
                     onChange={(e) => setFormData({ ...formData, warranty: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white text-slate-900"
                   >
                     <option value="">{t('selectWarranty')}</option>
                     {warrantyOptions.map((opt) => (
@@ -543,7 +543,7 @@ export default function SellPage() {
                     placeholder="e.g. 450"
                     value={formData.horsepower}
                     onChange={(e) => setFormData({ ...formData, horsepower: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 text-slate-900"
                   />
                 </div>
 
@@ -553,7 +553,7 @@ export default function SellPage() {
                   <select
                     value={formData.cylinders}
                     onChange={(e) => setFormData({ ...formData, cylinders: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white text-slate-900"
                   >
                     <option value="">{t('selectCylinders')}</option>
                     {cylinderOptions.map((opt) => (
@@ -568,7 +568,7 @@ export default function SellPage() {
                   <select
                     value={formData.body_type}
                     onChange={(e) => setFormData({ ...formData, body_type: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white text-slate-900"
                   >
                     <option value="">{t('selectBodyType')}</option>
                     {bodyTypes.map((opt) => (
@@ -584,7 +584,7 @@ export default function SellPage() {
                     required
                     value={formData.previous_owners}
                     onChange={(e) => setFormData({ ...formData, previous_owners: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white text-slate-900"
                   >
                     <option value="">{t('selectOwners')}</option>
                     <option value="1">{isAr ? '١ (مالك أول)' : '1 (Single Owner)'}</option>
@@ -602,7 +602,7 @@ export default function SellPage() {
                     placeholder="e.g. Chalk White, Nardo Grey"
                     value={formData.exterior_color}
                     onChange={(e) => setFormData({ ...formData, exterior_color: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 text-slate-900"
                   />
                 </div>
               </div>
@@ -615,14 +615,14 @@ export default function SellPage() {
                   placeholder={isAr ? 'اذكر تفاصيل إضافية مثل الضمان، الصيانة، وحالة الإطارات...' : 'Detail options, condition, and warranties...'}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 text-slate-900"
                 />
               </div>
             </div>
 
             {/* STEP 2: PHOTOS */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4 text-slate-900">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3 text-slate-900">
                 <Camera className="w-4 h-4 text-[#e03a14]" />
                 <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
                   {t('step2')}
@@ -632,8 +632,8 @@ export default function SellPage() {
             </div>
 
             {/* STEP 3: SERVICE HISTORY */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4 text-slate-900">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3 text-slate-900">
                 <FileText className="w-4 h-4 text-[#e03a14]" />
                 <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
                   {t('step3')}
@@ -649,7 +649,7 @@ export default function SellPage() {
                     type="date"
                     value={formData.last_service_date}
                     onChange={(e) => setFormData({ ...formData, last_service_date: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 text-slate-900"
                   />
                 </div>
                 <div>
@@ -661,20 +661,20 @@ export default function SellPage() {
                     placeholder="e.g. Major agency service, fresh tires"
                     value={formData.service_notes}
                     onChange={(e) => setFormData({ ...formData, service_notes: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 text-slate-900"
                   />
                 </div>
               </div>
 
               {/* Service Photos */}
-              <div className="pt-2 border-t border-slate-100">
+              <div className="pt-2 border-t border-slate-100 text-slate-900">
                 <label className="text-xs font-semibold text-slate-700 block mb-1.5">
                   {isAr ? 'صور فواتير الصيانة وسجل الوكالة (اختياري، حتى ٥ صور)' : 'Upload Service Invoices / Warranty Booklet (Optional, Max 5)'}
                 </label>
                 
                 <div className="flex flex-wrap gap-3 items-center">
                   {serviceDocPreviews.map((url, i) => (
-                    <div key={i} className="relative w-24 h-20 rounded-xl overflow-hidden border border-slate-200 group">
+                    <div key={i} className="relative w-24 h-20 rounded-xl overflow-hidden border border-slate-200 group text-slate-900">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={url} alt={`Service Doc ${i + 1}`} className="w-full h-full object-cover" />
                       <button
@@ -688,7 +688,7 @@ export default function SellPage() {
                   ))}
 
                   {serviceDocs.length < 5 && (
-                    <label className="w-24 h-20 border-2 border-dashed border-slate-300 hover:border-[#e03a14] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition">
+                    <label className="w-24 h-20 border-2 border-dashed border-slate-300 hover:border-[#e03a14] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition text-slate-900">
                       <UploadCloud className="w-5 h-5 text-slate-400" />
                       <span className="text-[10px] font-semibold text-slate-500 mt-1">
                         {isAr ? 'إضافة صورة' : 'Add Photo'}
@@ -720,8 +720,8 @@ export default function SellPage() {
         {/* TERMS & CONDITIONS POPUP MODAL */}
         {showTermsModal && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-lg w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-lg w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200 text-slate-900">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4 text-slate-900">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-5 h-5 text-[#e03a14]" />
                   <h3 className="text-base font-black text-slate-900">
@@ -741,7 +741,7 @@ export default function SellPage() {
                 {t('termsModalDesc')}
               </p>
 
-              <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 text-xs text-slate-700 leading-normal mb-5">
+              <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 text-xs text-slate-700 leading-normal mb-5 text-slate-900">
                 <div className="flex items-start gap-2">
                   <span className="text-[#e03a14] font-black">•</span>
                   <span>{t('term1')}</span>
@@ -761,7 +761,7 @@ export default function SellPage() {
                   type="checkbox"
                   checked={agreedToTerms}
                   onChange={(e) => setAgreedToTerms(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#e03a14] focus:ring-[#e03a14] border-slate-300"
+                  className="w-4 h-4 rounded text-[#e03a14] focus:ring-[#e03a14] border-slate-300 text-slate-900"
                 />
                 <span className="text-xs font-bold text-slate-800">
                   {t('termsAgreeCheckbox')}
@@ -772,7 +772,7 @@ export default function SellPage() {
                 <button
                   type="button"
                   onClick={() => setShowTermsModal(false)}
-                  className="py-2.5 px-4 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold transition"
+                  className="py-2.5 px-4 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold transition text-slate-900"
                 >
                   {t('cancel')}
                 </button>

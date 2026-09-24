@@ -134,7 +134,7 @@ function SearchContent() {
 
   const FilterControls = () => (
     <div className="space-y-5">
-      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-100 text-slate-900">
         <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
           <Filter className="w-3.5 h-3.5 text-[#e03a14]" />
           {isAr ? 'تصفية النتائج' : 'Filter Search'}
@@ -157,7 +157,7 @@ function SearchContent() {
         <select
           value={make}
           onChange={(e) => handleMakeChange(e.target.value)}
-          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14]"
+          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14] text-slate-900"
         >
           <option value="">{t('allMakes')}</option>
           {carData.makes.map((item) => (
@@ -175,7 +175,7 @@ function SearchContent() {
           disabled={!make || availableModels.length === 0}
           value={model}
           onChange={(e) => setModel(e.target.value)}
-          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14] disabled:bg-slate-100 disabled:text-slate-400"
+          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14] disabled:bg-slate-100 disabled:text-slate-400 text-slate-900"
         >
           <option value="">{make ? t('allModels') : t('selectMakeFirst')}</option>
           {availableModels.map((mod) => (
@@ -193,7 +193,7 @@ function SearchContent() {
           <select
             value={yearFrom}
             onChange={(e) => setYearFrom(e.target.value)}
-            className="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14]"
+            className="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14] text-slate-900"
           >
             <option value="">{isAr ? 'من سنة' : 'From'}</option>
             {years.map((y) => (
@@ -203,7 +203,7 @@ function SearchContent() {
           <select
             value={yearTo}
             onChange={(e) => setYearTo(e.target.value)}
-            className="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14]"
+            className="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14] text-slate-900"
           >
             <option value="">{isAr ? 'إلى سنة' : 'To'}</option>
             {years.map((y) => (
@@ -222,14 +222,14 @@ function SearchContent() {
             placeholder={isAr ? 'الحد الأدنى' : 'Min AED'}
             value={priceFrom}
             onChange={(e) => setPriceFrom(e.target.value)}
-            className="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14]"
+            className="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14] text-slate-900"
           />
           <input
             type="number"
             placeholder={isAr ? 'الحد الأقصى' : 'Max AED'}
             value={priceTo}
             onChange={(e) => setPriceTo(e.target.value)}
-            className="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14]"
+            className="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14] text-slate-900"
           />
         </div>
       </div>
@@ -242,7 +242,7 @@ function SearchContent() {
           placeholder={isAr ? 'أقصى مسافة (كم)' : 'Max KM (e.g. 100000)'}
           value={maxMileage}
           onChange={(e) => setMaxMileage(e.target.value)}
-          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14]"
+          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14] text-slate-900"
         />
       </div>
 
@@ -252,7 +252,7 @@ function SearchContent() {
         <select
           value={specs}
           onChange={(e) => setSpecs(e.target.value)}
-          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14]"
+          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14] text-slate-900"
         >
           <option value="">{t('allSpecs')}</option>
           {specsOptions.map((opt) => (
@@ -267,7 +267,7 @@ function SearchContent() {
         <select
           value={emirate}
           onChange={(e) => setEmirate(e.target.value)}
-          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14]"
+          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14] text-slate-900"
         >
           <option value="">{t('allEmirates')}</option>
           {emirateOptions.map((em) => (
@@ -282,9 +282,9 @@ function SearchContent() {
     <div className="min-h-screen bg-[#f8f9fa] py-6 sm:py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top Header Bar */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 mb-6 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 mb-6 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-slate-900">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-orange-50 text-[#e03a14] flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-xl bg-orange-50 text-[#e03a14] flex items-center justify-center font-bold text-slate-900">
               <Car className="w-5 h-5" />
             </div>
             <div>
@@ -302,7 +302,7 @@ function SearchContent() {
             <button
               type="button"
               onClick={() => setMobileFilterOpen(true)}
-              className="lg:hidden bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-2 px-3 rounded-xl flex items-center gap-1.5 transition"
+              className="lg:hidden bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-2 px-3 rounded-xl flex items-center gap-1.5 transition text-slate-900"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-[#e03a14]" />
               <span>{isAr ? 'تصفية' : 'Filters'}</span>
@@ -317,7 +317,7 @@ function SearchContent() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14] cursor-pointer"
+                className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14] cursor-pointer text-slate-900"
               >
                 <option value="default">{t('sortDefault')}</option>
                 <option value="newest">{t('sortNewest')}</option>
@@ -335,20 +335,20 @@ function SearchContent() {
 
         {/* Main Grid: Left Filter Sidebar + Right Listings */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-          <div className="hidden lg:block lg:col-span-1 bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs sticky top-24">
+          <div className="hidden lg:block lg:col-span-1 bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs sticky top-24 text-slate-900">
             <FilterControls />
           </div>
 
           <div className="lg:col-span-3">
             {loading ? (
               <div className="py-24 text-center">
-                <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#e03a14] border-t-transparent mx-auto mb-3"></div>
+                <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#e03a14] border-t-transparent mx-auto mb-3 text-slate-900"></div>
                 <p className="text-xs text-slate-500 font-semibold">
                   {isAr ? 'جاري تحديث نتائج البحث...' : 'Loading verified vehicles...'}
                 </p>
               </div>
             ) : listings.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-2xs">
+              <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-2xs text-slate-900">
                 <Car className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                 <h3 className="text-sm font-bold text-slate-800 mb-1">
                   {isAr ? 'لا توجد سيارات تطابق معايير البحث' : 'No cars match your search filters'}
@@ -380,8 +380,8 @@ function SearchContent() {
         {/* Mobile Filter Modal */}
         {mobileFilterOpen && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="bg-white rounded-t-3xl sm:rounded-3xl border border-slate-200 p-6 w-full max-w-md max-h-[85vh] overflow-y-auto shadow-2xl animate-in slide-in-from-bottom duration-200">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+            <div className="bg-white rounded-t-3xl sm:rounded-3xl border border-slate-200 p-6 w-full max-w-md max-h-[85vh] overflow-y-auto shadow-2xl animate-in slide-in-from-bottom duration-200 text-slate-900">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4 text-slate-900">
                 <h3 className="text-sm font-black text-slate-900 flex items-center gap-1.5">
                   <SlidersHorizontal className="w-4 h-4 text-[#e03a14]" />
                   {isAr ? 'عوامل التصفية' : 'Search Filters'}
@@ -397,11 +397,11 @@ function SearchContent() {
 
               <FilterControls />
 
-              <div className="pt-5 border-t border-slate-100 mt-6 grid grid-cols-2 gap-2">
+              <div className="pt-5 border-t border-slate-100 mt-6 grid grid-cols-2 gap-2 text-slate-900">
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="py-2.5 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  className="py-2.5 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 text-slate-900"
                 >
                   {t('reset')}
                 </button>
