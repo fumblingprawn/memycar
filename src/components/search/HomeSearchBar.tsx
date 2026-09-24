@@ -93,9 +93,27 @@ export default function HomeSearchBar() {
               className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white disabled:bg-slate-100 outline-none focus:ring-2 focus:ring-[#e03a14]"
             >
               <option value="">{isAr ? 'جميع الموديلات' : 'All Models'}</option>
-              {availableModels.map((mod) => (
-                <option key={mod} value={mod}>{mod}</option>
-              ))}
+              {availableModels.map((item, idx) => {
+              if (typeof item === "string") {
+                return (
+                  <option key={idx} value={item}>
+                    {item}
+                  </option>
+                );
+              }
+              return (
+                <optgroup key={item.groupName} label={`— ${item.groupName} —`}>
+                  <option value={`${item.groupName} (All)`}>
+                    {item.groupName} (All)
+                  </option>
+                  {item.models.map((m) => (
+                    <option key={m} value={m}>
+                      &nbsp;&nbsp;&nbsp;{m}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            })}
             </select>
           </div>
         </div>

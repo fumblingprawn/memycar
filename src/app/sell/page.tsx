@@ -375,11 +375,24 @@ export default function SellPage() {
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14] disabled:bg-slate-100 disabled:text-slate-400"
                   >
                     <option value="">{make ? t('allModels') : t('selectMakeFirst')}</option>
-                    {availableModels.map((mod) => (
-                      <option key={mod} value={mod}>
-                        {isAr ? t(mod) : mod}
-                      </option>
-                    ))}
+                    {availableModels.map((item, idx) => {
+                      if (typeof item === "string") {
+                        return (
+                          <option key={idx} value={item}>
+                            {isAr ? t(item) : item}
+                          </option>
+                        );
+                      }
+                      return (
+                        <optgroup key={item.groupName} label={`— ${item.groupName} —`}>
+                          {item.models.map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </optgroup>
+                      );
+                    })}
                   </select>
                 </div>
               </div>
