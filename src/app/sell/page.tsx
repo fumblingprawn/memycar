@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
@@ -13,9 +13,26 @@ import {
   Loader2, 
   ArrowLeft,
   MapPin,
-  Camera
+  Camera,
+  CheckCircle2,
+  RefreshCw
 } from 'lucide-react';
 import Link from 'next/link';
+
+interface AngleSlot {
+  key: 'front' | 'rear' | 'side' | 'interior';
+  titleEn: string;
+  titleAr: string;
+  subEn: string;
+  subAr: string;
+}
+
+const ANGLE_SLOTS: AngleSlot[] = [
+  { key: 'front', titleEn: 'Front 3/4 Angle', titleAr: 'زاوية أمامية ٣/٤', subEn: 'Driver or passenger front', subAr: 'الأمامية يمين أو يسار' },
+  { key: 'rear', titleEn: 'Rear 3/4 Angle', titleAr: 'زاوية خلفية ٣/٤', subEn: 'Exhaust & taillights', subAr: 'الجهة الخلفية والمصابيح' },
+  { key: 'side', titleEn: 'Full Side Profile', titleAr: 'الجانب بالكامل', subEn: 'Full wheel & body line', subAr: 'المظهر الجانبي والعجلات' },
+  { key: 'interior', titleEn: 'Dashboard & Cockpit', titleAr: 'المقصورة والعدادات', subEn: 'Steering wheel & console', subAr: 'عجلة القيادة والكونسول' },
+];
 
 export default function SellPage() {
   const router = useRouter();
@@ -25,7 +42,7 @@ export default function SellPage() {
   const [user, setUser] = useState<any>(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
-  // Form Fields - clean initial states
+  // Form Fields
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
   const [trim, setTrim] = useState('');
@@ -40,11 +57,34 @@ export default function SellPage() {
   const [city, setCity] = useState('');
   const [description, setDescription] = useState('');
 
-  // Media & Submission State
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  // Structured Wireframe Photos (Index 0: Front, 1: Rear, 2: Side, 3: Interior)
+  const [wireframeFiles, setWireframeFiles] = useState<{ [key: string]: File | null }>({
+    front: null,
+    rear: null,
+    side: null,
+    interior: null,
+  });
+  const [wireframePreviews, setWireframePreviews] = useState<{ [key: string]: string | null }>({
+    front: null,
+    rear: null,
+    side: null,
+    interior: null,
+  });
+
+  // Additional freeform photos
+  const [additionalFiles, setAdditionalFiles] = useState<File[]>([]);
+  const [additionalPreviews, setAdditionalPreviews] = useState<string[]>([]);
+
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const fileInputRefs = {
+    front: useRef<HTMLInputElement>(null),
+    rear: useRef<HTMLInputElement>(null),
+    side: useRef<HTMLInputElement>(null),
+    interior: useRef<HTMLInputElement>(null),
+    additional: useRef<HTMLInputElement>(null),
+  };
 
   const emirates = ['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain'];
   const specsList = ['GCC Specs', 'Non-GCC / American', 'Non-GCC / Japanese', 'Non-GCC / European', 'Other'];
@@ -74,24 +114,50 @@ export default function SellPage() {
     setTrim('');
   };
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle uploading specific angle wireframe photo
+  const handleAngleFileSelect = (key: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (wireframePreviews[key]) {
+        URL.revokeObjectURL(wireframePreviews[key]!);
+      }
+      setWireframeFiles((prev) => ({ ...prev, [key]: file }));
+      setWireframePreviews((prev) => ({ ...prev, [key]: URL.createObjectURL(file) }));
+    }
+  };
+
+  const handleRemoveAnglePhoto = (key: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (wireframePreviews[key]) {
+      URL.revokeObjectURL(wireframePreviews[key]!);
+    }
+    setWireframeFiles((prev) => ({ ...prev, [key]: null }));
+    setWireframePreviews((prev) => ({ ...prev, [key]: null }));
+    if (fileInputRefs[key as keyof typeof fileInputRefs].current) {
+      fileInputRefs[key as keyof typeof fileInputRefs].current!.value = '';
+    }
+  };
+
+  // Handle additional photos
+  const handleAdditionalSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length + imageFiles.length > 15) {
-      setErrorMsg(isAr ? 'الحد الأقصى المسموح به هو ١٥ صورة' : 'Maximum 15 photos allowed');
+    const currentWireCount = Object.values(wireframeFiles).filter(Boolean).length;
+    const totalCount = currentWireCount + additionalFiles.length + files.length;
+
+    if (totalCount > 15) {
+      setErrorMsg(isAr ? 'الحد الأقصى المسموح به هو ١٥ صورة شاملة' : 'Maximum 15 photos in total allowed');
       return;
     }
 
-    const newFiles = [...imageFiles, ...files];
-    setImageFiles(newFiles);
-
-    const newPreviews = files.map((file) => URL.createObjectURL(file));
-    setImagePreviews((prev) => [...prev, ...newPreviews]);
+    setAdditionalFiles((prev) => [...prev, ...files]);
+    const newPreviews = files.map((f) => URL.createObjectURL(f));
+    setAdditionalPreviews((prev) => [...prev, ...newPreviews]);
   };
 
-  const handleRemoveImage = (index: number) => {
-    URL.revokeObjectURL(imagePreviews[index]);
-    setImageFiles((prev) => prev.filter((_, i) => i !== index));
-    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveAdditional = (index: number) => {
+    URL.revokeObjectURL(additionalPreviews[index]);
+    setAdditionalFiles((prev) => prev.filter((_, i) => i !== index));
+    setAdditionalPreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -104,15 +170,22 @@ export default function SellPage() {
       return;
     }
 
-    if (imageFiles.length === 0) {
-      setErrorMsg(isAr ? 'يرجى تحميل صورة واحدة على الأقل للسيارة' : 'Please upload at least one photo of the vehicle');
+    // Gather all files (front wireframe first as cover, followed by other angles, then additionals)
+    const allFilesToUpload: File[] = [];
+    ['front', 'rear', 'side', 'interior'].forEach((k) => {
+      if (wireframeFiles[k]) allFilesToUpload.push(wireframeFiles[k]!);
+    });
+    allFilesToUpload.push(...additionalFiles);
+
+    if (allFilesToUpload.length === 0) {
+      setErrorMsg(isAr ? 'يرجى تحميل صورة واحدة على الأقل للسيارة (يفضل زاوية الواجهة الأمامية)' : 'Please upload at least one photo (Front 3/4 recommended)');
       return;
     }
 
     setSubmitting(true);
     try {
       const uploadedUrls: string[] = [];
-      for (const file of imageFiles) {
+      for (const file of allFilesToUpload) {
         const fileExt = file.name.split('.').pop() || 'jpg';
         const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
 
@@ -174,6 +247,59 @@ export default function SellPage() {
       </div>
     );
   }
+
+  // Visual SVG Car Sketch Component
+  const AngleIllustration = ({ type }: { type: string }) => {
+    switch (type) {
+      case 'front':
+        return (
+          <svg className="w-14 h-9 text-slate-400 group-hover:text-[#e03a14] transition" viewBox="0 0 100 60" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            {/* Front 3/4 Wireframe Silhouette */}
+            <path d="M 12 36 L 22 22 L 48 20 L 75 25 L 88 35 L 94 40 L 92 48 L 12 48 Z" />
+            <path d="M 28 22 L 35 34 L 70 34 L 75 25" />
+            <circle cx="28" cy="48" r="7" strokeWidth="2.5" fill="#f8f9fa" />
+            <circle cx="78" cy="48" r="7" strokeWidth="2.5" fill="#f8f9fa" />
+            <path d="M 40 37 L 65 37" />
+            <path d="M 16 38 L 22 37" />
+          </svg>
+        );
+      case 'rear':
+        return (
+          <svg className="w-14 h-9 text-slate-400 group-hover:text-[#e03a14] transition" viewBox="0 0 100 60" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            {/* Rear 3/4 Wireframe Silhouette */}
+            <path d="M 88 36 L 78 22 L 52 20 L 25 25 L 12 35 L 6 40 L 8 48 L 88 48 Z" />
+            <path d="M 72 22 L 65 34 L 30 34 L 25 25" />
+            <circle cx="72" cy="48" r="7" strokeWidth="2.5" fill="#f8f9fa" />
+            <circle cx="22" cy="48" r="7" strokeWidth="2.5" fill="#f8f9fa" />
+            <path d="M 60 37 L 35 37" />
+            <path d="M 84 38 L 78 37" />
+          </svg>
+        );
+      case 'side':
+        return (
+          <svg className="w-14 h-9 text-slate-400 group-hover:text-[#e03a14] transition" viewBox="0 0 100 60" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            {/* Full Side Profile Silhouette */}
+            <path d="M 8 42 L 14 36 L 25 36 L 38 24 L 68 24 L 84 34 L 95 38 L 95 44 L 8 44 Z" />
+            <circle cx="26" cy="44" r="8" strokeWidth="2.5" fill="#f8f9fa" />
+            <circle cx="76" cy="44" r="8" strokeWidth="2.5" fill="#f8f9fa" />
+            <path d="M 39 26 L 53 26 L 53 36 L 28 36 Z" />
+            <path d="M 57 26 L 67 26 L 79 36 L 57 36 Z" />
+          </svg>
+        );
+      case 'interior':
+      default:
+        return (
+          <svg className="w-14 h-9 text-slate-400 group-hover:text-[#e03a14] transition" viewBox="0 0 100 60" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            {/* Dashboard / Cockpit Silhouette */}
+            <path d="M 10 46 L 20 28 L 80 28 L 90 46 Z" />
+            <circle cx="34" cy="40" r="10" strokeWidth="2.5" />
+            <path d="M 34 35 L 34 45" />
+            <path d="M 29 40 L 39 40" />
+            <rect x="52" y="32" width="22" height="12" rx="2" strokeWidth="2" />
+          </svg>
+        );
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] py-8">
@@ -354,7 +480,7 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* Fuel Type (Placeholder: Fuel type) */}
+                {/* Fuel Type */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
                     {t('fuelType')} *
@@ -393,7 +519,6 @@ export default function SellPage() {
 
               {/* Warranty & Service Contract */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                {/* Warranty */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
                     {t('warranty')} *
@@ -410,7 +535,6 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* Service Contract (Placeholder: Service Contract Status) */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
                     {isAr ? 'عقد صيانة (Service Contract) *' : 'Service Contract *'}
@@ -429,7 +553,7 @@ export default function SellPage() {
               </div>
             </div>
 
-            {/* 3. LOCATION & CONTACT (Moved cleanly outside specs) */}
+            {/* 3. LOCATION & CONTACT */}
             <div className="space-y-3 pt-4 border-t border-slate-100">
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-[#e03a14]" />
@@ -467,88 +591,124 @@ export default function SellPage() {
               />
             </div>
 
-            {/* 5. WIREFRAME ANGLE GUIDE & PHOTO UPLOADS */}
+            {/* 5. INTERACTIVE WIREFRAME ANGLE UPLOAD SLOTS */}
             <div className="space-y-4 pt-4 border-t border-slate-100">
               <div>
                 <label className="text-xs font-bold text-slate-900 block">
-                  {isAr ? 'صور السيارة (حتى ١٥ صورة) *' : 'Vehicle Photos (Max 15) *'}
+                  {isAr ? 'التقاط صور الزوايا الرئيسية للمركبة *' : 'Capture Key Vehicle Angles (Click each box) *'}
                 </label>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  {isAr ? 'التقط صوراً واضحة للسيارة لزيادة عدد المشترين وثقتهم' : 'Follow the framing guide below to capture clean, high-converting photos'}
+                  {isAr ? 'انقر على أي زاوية لرفع الصورة المطلوبة مباشرة' : 'Click on any slot to upload or snap that specific angle'}
                 </p>
               </div>
 
-              {/* Visual Wireframe Guides */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
-                <div className="border border-dashed border-slate-300 rounded-xl p-2.5 text-center bg-white">
-                  <div className="w-7 h-7 mx-auto rounded-lg bg-orange-50 text-[#e03a14] flex items-center justify-center mb-1">
-                    <Camera className="w-3.5 h-3.5" />
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-700 block">{t('angleFront')}</span>
-                  <span className="text-[9px] text-slate-400">45° Angle</span>
-                </div>
+              {/* 4 Dedicated Upload Angle Boxes */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {ANGLE_SLOTS.map((slot) => {
+                  const preview = wireframePreviews[slot.key];
+                  return (
+                    <div
+                      key={slot.key}
+                      onClick={() => fileInputRefs[slot.key].current?.click()}
+                      className={`relative aspect-[4/3] rounded-2xl border-2 transition cursor-pointer flex flex-col items-center justify-center p-3 text-center group overflow-hidden ${
+                        preview
+                          ? 'border-emerald-500 bg-slate-900'
+                          : 'border-dashed border-slate-300 hover:border-[#e03a14] bg-slate-50 hover:bg-orange-50/20'
+                      }`}
+                    >
+                      <input
+                        type="file"
+                        accept="image/*"
+                        ref={fileInputRefs[slot.key]}
+                        onChange={(e) => handleAngleFileSelect(slot.key, e)}
+                        className="hidden"
+                      />
 
-                <div className="border border-dashed border-slate-300 rounded-xl p-2.5 text-center bg-white">
-                  <div className="w-7 h-7 mx-auto rounded-lg bg-orange-50 text-[#e03a14] flex items-center justify-center mb-1">
-                    <Camera className="w-3.5 h-3.5" />
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-700 block">{t('angleRear')}</span>
-                  <span className="text-[9px] text-slate-400">45° Angle</span>
-                </div>
-
-                <div className="border border-dashed border-slate-300 rounded-xl p-2.5 text-center bg-white">
-                  <div className="w-7 h-7 mx-auto rounded-lg bg-orange-50 text-[#e03a14] flex items-center justify-center mb-1">
-                    <Camera className="w-3.5 h-3.5" />
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-700 block">{t('angleSide')}</span>
-                  <span className="text-[9px] text-slate-400">Profile View</span>
-                </div>
-
-                <div className="border border-dashed border-slate-300 rounded-xl p-2.5 text-center bg-white">
-                  <div className="w-7 h-7 mx-auto rounded-lg bg-orange-50 text-[#e03a14] flex items-center justify-center mb-1">
-                    <Camera className="w-3.5 h-3.5" />
-                  </div>
-                  <span className="text-[10px] font-bold text-slate-700 block">{t('angleInterior')}</span>
-                  <span className="text-[9px] text-slate-400">Cockpit View</span>
-                </div>
+                      {preview ? (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={preview}
+                            alt={slot.titleEn}
+                            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+                            <span className="bg-white/90 text-slate-800 text-[10px] font-bold py-1 px-2 rounded-lg flex items-center gap-1">
+                              <RefreshCw className="w-3 h-3 text-[#e03a14]" />
+                              {isAr ? 'تغيير' : 'Change'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => handleRemoveAnglePhoto(slot.key, e)}
+                              className="bg-red-600 text-white p-1 rounded-lg hover:bg-red-700 transition"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <div className="absolute top-2 left-2 bg-emerald-500 text-white rounded-full p-0.5 shadow-sm">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                          </div>
+                          <span className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-xs text-white text-[9px] font-bold py-0.5 rounded truncate px-1">
+                            {isAr ? slot.titleAr : slot.titleEn}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <AngleIllustration type={slot.key} />
+                          <div className="mt-2">
+                            <span className="text-[11px] font-black text-slate-800 group-hover:text-[#e03a14] block leading-tight">
+                              {isAr ? slot.titleAr : slot.titleEn}
+                            </span>
+                            <span className="text-[9px] text-slate-400 mt-0.5 flex items-center justify-center gap-1">
+                              <Camera className="w-2.5 h-2.5 text-[#e03a14]" />
+                              {isAr ? 'انقر للرفع' : 'Click to add'}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* Upload Grid */}
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                {imagePreviews.map((src, idx) => (
-                  <div key={idx} className="relative aspect-video rounded-xl overflow-hidden border border-slate-200 group bg-slate-100">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt="thumb" className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveImage(idx)}
-                      className="absolute top-1 right-1 bg-black/70 hover:bg-red-600 text-white rounded-full p-1 transition"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                    {idx === 0 && (
-                      <span className="absolute bottom-1 left-1 bg-black/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
-                        Cover
-                      </span>
-                    )}
-                  </div>
-                ))}
+              {/* Additional Photos Section */}
+              <div className="pt-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-700">
+                    {isAr ? 'صور إضافية (اختياري - حتى ١٥ صورة)' : 'Additional Photos (Optional - Wheels, Engine, Details)'}
+                  </span>
+                </div>
 
-                {imagePreviews.length < 15 && (
-                  <label className="aspect-video rounded-xl border-2 border-dashed border-slate-300 hover:border-[#e03a14] flex flex-col items-center justify-center cursor-pointer transition bg-slate-50 hover:bg-orange-50/30">
-                    <Upload className="w-5 h-5 text-slate-400 group-hover:text-[#e03a14]" />
-                    <span className="text-[10px] text-slate-500 font-semibold mt-1">
-                      {isAr ? 'أضف صور' : 'Add Photo'}
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
+                  {additionalPreviews.map((src, idx) => (
+                    <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 group bg-slate-100">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={src} alt="" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAdditional(idx)}
+                        className="absolute top-1 right-1 bg-black/70 hover:bg-red-600 text-white rounded-full p-1 transition"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+
+                  <label className="aspect-square rounded-xl border-2 border-dashed border-slate-300 hover:border-[#e03a14] flex flex-col items-center justify-center cursor-pointer transition bg-slate-50 hover:bg-orange-50/20">
+                    <Upload className="w-4 h-4 text-slate-400 group-hover:text-[#e03a14]" />
+                    <span className="text-[9px] text-slate-500 font-bold mt-1">
+                      {isAr ? '+ صورة' : '+ Add'}
                     </span>
                     <input
                       type="file"
                       multiple
                       accept="image/*"
-                      onChange={handleImageSelect}
+                      ref={fileInputRefs.additional}
+                      onChange={handleAdditionalSelect}
                       className="hidden"
                     />
                   </label>
-                )}
+                </div>
               </div>
             </div>
 
