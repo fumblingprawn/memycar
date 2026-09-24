@@ -56,7 +56,6 @@ function DashboardContent() {
   // Profile Form State
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [accountType, setAccountType] = useState('private'); // 'private' or 'dealer'
   const [isLocked, setIsLocked] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState(false);
@@ -98,11 +97,9 @@ function DashboardContent() {
     setUser(user);
     const savedName = user.user_metadata?.full_name || '';
     const savedPhone = user.user_metadata?.phone || '';
-    const savedRole = user.user_metadata?.account_type || user.user_metadata?.role || 'private';
     
     setFullName(savedName);
     setPhone(savedPhone);
-    setAccountType(savedRole);
 
     if (savedName && savedPhone) {
       setIsLocked(true);
@@ -162,7 +159,7 @@ function DashboardContent() {
     fetchUserData();
   }, [fetchUserData]);
 
-  // Realtime notification listener
+  // Realtime global notifications for new incoming chat
   useEffect(() => {
     if (!user) return;
 
@@ -272,7 +269,6 @@ function DashboardContent() {
     }
   };
 
-  // Quick Unsave / Remove from Saved Cars
   const handleRemoveSavedListing = async (listingId: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -395,6 +391,7 @@ function DashboardContent() {
 
   const handleSaveAndLock = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLocked) return;
 
     setProfileSaving(true);
     setProfileSuccess(false);
@@ -425,8 +422,6 @@ function DashboardContent() {
         data: {
           full_name: fullName.trim(),
           phone: formattedPhone,
-          account_type: accountType,
-          role: accountType,
         }
       });
 
@@ -500,7 +495,8 @@ function DashboardContent() {
     );
   }
 
-  const isDealer = accountType === 'dealer';
+  // Gated strictly to backend verification: is_dealer_verified must be true
+  const isDealerVerified = user?.user_metadata?.is_dealer_verified === true;
   const selectedCar = Array.isArray(selectedConv?.listings) ? selectedConv.listings[0] : selectedConv?.listings;
   const targetListingId = selectedConv?.listing_id || selectedCar?.id;
 
@@ -560,10 +556,10 @@ function DashboardContent() {
                 <h1 className="text-lg font-black text-slate-900">
                   {fullName || user?.email}
                 </h1>
-                {isDealer && (
-                  <span className="bg-orange-50 text-[#e03a14] border border-orange-200 text-[10px] font-black px-2 py-0.5 rounded-md flex items-center gap-1">
+                {isDealerVerified && (
+                  <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black px-2 py-0.5 rounded-md flex items-center gap-1">
                     <Building2 className="w-3 h-3" />
-                    DEALERSHIP
+                    VERIFIED DEALER
                   </span>
                 )}
               </div>
@@ -583,8 +579,8 @@ function DashboardContent() {
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            {/* Dealer Bulk Upload Button ONLY for Dealers */}
-            {isDealer && (
+            {/* Dealer Bulk Upload Button ONLY for Admin-Verified Dealers */}
+            {isDealerVerified && (
               <Link
                 href="/dashboard/bulk-upload"
                 className="flex-1 sm:flex-none justify-center bg-slate-900 hover:bg-black text-white text-xs font-bold py-2.5 px-3.5 rounded-xl flex items-center gap-1.5 transition shadow-2xs"
@@ -663,7 +659,7 @@ function DashboardContent() {
           </button>
         </div>
 
-        {/* TAB 1: MY LISTINGS (With Mark as Sold) */}
+        {/* TAB 1: MY LISTINGS */}
         {activeTab === 'listings' && (
           <div>
             {myListings.length === 0 ? (
@@ -756,7 +752,7 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* TAB 2: SAVED CARS (With Quick Delete/Unsave Button) */}
+        {/* TAB 2: SAVED CARS */}
         {activeTab === 'saved' && (
           <div>
             {savedListings.length === 0 ? (
@@ -775,7 +771,6 @@ function DashboardContent() {
                 {savedListings.map((car) => (
                   <div key={car.id} className="relative group">
                     <ListingCard listing={car} />
-                    {/* Quick Delete / Unsave Overlay Button */}
                     <button
                       type="button"
                       onClick={(e) => handleRemoveSavedListing(car.id, e)}
@@ -1000,7 +995,7 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* TAB 4: ACCOUNT SETTINGS (With Account Type / Dealer Switch) */}
+        {/* TAB 4: ACCOUNT SETTINGS */}
         {activeTab === 'account' && (
           <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-lg shadow-2xs space-y-6">
             <div className="flex items-start justify-between gap-3">
@@ -1112,46 +1107,46 @@ function DashboardContent() {
                 </div>
               </div>
 
-              {/* Account Type Selector (Dealer vs Private) */}
-              <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  {isAr ? 'نوع الحساب (فردي أو معرض سيارات)' : 'Account Type (Private or Commercial Dealer)'}
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setAccountType('private')}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                      accountType === 'private'
-                        ? 'bg-slate-900 text-white border-slate-900'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    <UserIcon className="w-3.5 h-3.5" />
-                    <span>{isAr ? 'بائع فردي' : 'Private Seller'}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setAccountType('dealer')}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                      accountType === 'dealer'
-                        ? 'bg-[#e03a14] text-white border-[#e03a14]'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Building2 className="w-3.5 h-3.5" />
-                    <span>{isAr ? 'معرض سيارات' : 'Car Dealership'}</span>
-                  </button>
+              {/* Verified Dealer Status Banner */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">
+                    {isAr ? 'حالة حساب المعارض' : 'Showroom / Dealer Status'}
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    {isDealerVerified
+                      ? (isAr ? 'حساب معرض سيارات موثق ومفعل من الإدارة. ميزة الرفع الجماعي مفعلة.' : 'Verified Dealership Account. Bulk Uploader is active.')
+                      : (isAr ? 'لتفعيل ميزة الرفع الجماعي لمعرضك، يرجى التواصل مع الإدارة.' : 'To verify as a dealership and unlock Bulk Upload, contact support.')}
+                  </span>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  {accountType === 'dealer'
-                    ? (isAr ? 'حساب المعارض يفعل ميزة الرفع الجماعي للسيارات عبر ملف Excel/CSV.' : 'Dealership accounts enable bulk CSV fleet inventory uploads.')
-                    : (isAr ? 'حساب بائع فردي عادي.' : 'Standard individual seller profile.')}
-                </p>
+                {isDealerVerified ? (
+                  <span className="bg-emerald-50 text-emerald-700 text-[10px] font-black px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1 flex-shrink-0">
+                    <Building2 className="w-3 h-3" />
+                    VERIFIED
+                  </span>
+                ) : (
+                  <a
+                    href="mailto:support@memycar.com?subject=Dealership%20Verification%20Request"
+                    className="text-[11px] font-bold text-[#e03a14] hover:underline flex-shrink-0"
+                  >
+                    {isAr ? 'طلب توثيق' : 'Contact Support'}
+                  </a>
+                )}
               </div>
 
-              {!isLocked ? (
+              {isLocked ? (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-500 leading-relaxed">
+                  <span className="font-semibold text-slate-700 block mb-0.5">
+                    {isAr ? 'هل تحتاج إلى تغيير رقم هاتفك أو اسمك؟' : 'Need to update your verified credentials?'}
+                  </span>
+                  {isAr 
+                    ? 'لحماية المشترين ومصداقية الإعلانات، يرجى التواصل مع فريق الدعم على ' 
+                    : 'To protect buyers and listings integrity, please contact support at '}
+                  <a href="mailto:support@memycar.com" className="text-[#e03a14] font-bold underline">
+                    support@memycar.com
+                  </a>
+                </div>
+              ) : (
                 <button
                   type="submit"
                   disabled={profileSaving}
@@ -1160,18 +1155,9 @@ function DashboardContent() {
                   {profileSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   {isAr ? 'حفظ وتثبيت البيانات' : 'Save & Lock Details'}
                 </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={profileSaving}
-                  className="bg-slate-800 hover:bg-black disabled:bg-slate-300 text-white text-xs font-bold py-2 px-4 rounded-xl transition flex items-center justify-center gap-1.5"
-                >
-                  {profileSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  {isAr ? 'تحديث نوع الحساب' : 'Update Account Type'}
-                </button>
               )}
 
-              {/* Danger Zone: Delete Account */}
+              {/* Delete Account */}
               <div className="pt-6 border-t border-red-100">
                 <h4 className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">
                   {t('deleteAccount')}
