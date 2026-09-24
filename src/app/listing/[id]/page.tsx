@@ -83,6 +83,15 @@ export default function ListingDetailPage() {
         if (error) throw error;
         setListing(data);
 
+        if (data?.user_id) {
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('phone, full_name, display_name')
+            .eq('id', data.user_id)
+            .maybeSingle();
+          if (prof) setSellerProfile(prof);
+        }
+
         // Increment view count in Supabase
         supabase.rpc('increment_listing_view', { target_listing_id: listingId }).then(() => {});
       } catch (err) {
@@ -273,7 +282,7 @@ export default function ListingDetailPage() {
   const serviceContract = listing.service_contract || 'No';
   const horsepower = listing.horsepower || null;
   const serviceHistory = listing.last_service_date ? 'Documented' : 'Standard';
-  const phone = listing.seller_phone || listing.whatsapp_number || '';
+  const phone = listing.seller_phone || listing.phone || listing.whatsapp_number || sellerProfile?.phone || '';
   const sellerName = listing.seller_name || (isAr ? 'عضو موثق' : 'Verified Member');
   const viewCount = (listing.view_count ?? 0) + 1;
 
