@@ -76,7 +76,7 @@ function SearchContent() {
 
   const fetchResults = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from('listings').select('*');
+    let query = supabase.from('listings').select('*').neq('status', 'archived');
 
     if (make && make !== 'Other') query = query.ilike('make', `%${make}%`);
     if (model && model !== 'Other') query = query.ilike('model', `%${model}%`);

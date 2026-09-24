@@ -11,8 +11,7 @@ import {
   Bookmark, 
   User as UserIcon, 
   LogOut, 
-  PlusCircle,
-  FileSpreadsheet, 
+  PlusCircle, 
   Trash2, 
   ExternalLink,
   ShieldCheck,
@@ -26,7 +25,9 @@ import {
   Paperclip,
   X,
   BellRing,
-  ArrowRight
+  ArrowRight,
+  FileSpreadsheet,
+  Building2
 } from 'lucide-react';
 
 interface ToastNotice {
@@ -55,6 +56,7 @@ function DashboardContent() {
   // Profile Form State
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [accountType, setAccountType] = useState('private'); // 'private' or 'dealer'
   const [isLocked, setIsLocked] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState(false);
@@ -96,8 +98,11 @@ function DashboardContent() {
     setUser(user);
     const savedName = user.user_metadata?.full_name || '';
     const savedPhone = user.user_metadata?.phone || '';
+    const savedRole = user.user_metadata?.account_type || user.user_metadata?.role || 'private';
+    
     setFullName(savedName);
     setPhone(savedPhone);
+    setAccountType(savedRole);
 
     if (savedName && savedPhone) {
       setIsLocked(true);
@@ -135,7 +140,7 @@ function DashboardContent() {
       .from('conversations')
       .select(`
         *,
-        listings:listing_id (id, make, model, year, price, image_urls)
+        listings:listing_id (id, make, model, year, price, image_urls, status)
       `)
       .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
       .order('last_message_at', { ascending: false });
@@ -157,7 +162,7 @@ function DashboardContent() {
     fetchUserData();
   }, [fetchUserData]);
 
-  // Global Realtime listener for incoming messages to trigger sliding notifications
+  // Realtime notification listener
   useEffect(() => {
     if (!user) return;
 
@@ -171,9 +176,7 @@ function DashboardContent() {
           table: 'messages',
         },
         async (payload) => {
-          // If message is from someone else
           if (payload.new.sender_id !== user.id) {
-            // Find related conversation
             const targetConv = conversations.find((c) => c.id === payload.new.conversation_id);
             const car = Array.isArray(targetConv?.listings) ? targetConv.listings[0] : targetConv?.listings;
             const carTitle = car ? `${car.year} ${car.make} ${car.model}` : 'Vehicle Inquiry';
@@ -187,7 +190,6 @@ function DashboardContent() {
               snippet: payload.new.content || (isAr ? 'أرسل صورة' : 'Sent an image'),
             });
 
-            // Auto-hide toast after 5.5 seconds
             setTimeout(() => {
               setToast((curr) => (curr?.id === payload.new.id ? null : curr));
             }, 5500);
@@ -201,7 +203,7 @@ function DashboardContent() {
     };
   }, [user, conversations, supabase, isAr]);
 
-  // Active chat real-time listener for current selected conversation
+  // Active chat listener
   useEffect(() => {
     if (!selectedConv) return;
 
@@ -244,6 +246,51 @@ function DashboardContent() {
       supabase.removeChannel(channel);
     };
   }, [selectedConv, supabase]);
+
+  const handleToggleSold = async (listingId: string, currentStatus: string) => {
+    try {
+      const newStatus = currentStatus === 'sold' ? 'active' : 'sold';
+      const rpcName = currentStatus === 'sold' ? 'reactivate_listing' : 'mark_listing_as_sold';
+
+      setMyListings((prev) =>
+        prev.map((c) => (c.id === listingId ? { ...c, status: newStatus } : c))
+      );
+
+      const { error } = await supabase.rpc(rpcName, { target_listing_id: listingId });
+      if (error) {
+        await supabase
+          .from('listings')
+          .update({
+            status: newStatus,
+            sold_at: newStatus === 'sold' ? new Date().toISOString() : null,
+          })
+          .eq('id', listingId);
+      }
+    } catch (err) {
+      console.error('Failed to update status:', err);
+      fetchUserData();
+    }
+  };
+
+  // Quick Unsave / Remove from Saved Cars
+  const handleRemoveSavedListing = async (listingId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) return;
+
+    setSavedListings((prev) => prev.filter((item) => item.id !== listingId));
+
+    try {
+      await supabase
+        .from('saved_listings')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('listing_id', listingId);
+    } catch (err) {
+      console.error('Error removing saved listing:', err);
+      fetchUserData();
+    }
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -348,7 +395,6 @@ function DashboardContent() {
 
   const handleSaveAndLock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLocked) return;
 
     setProfileSaving(true);
     setProfileSuccess(false);
@@ -379,6 +425,8 @@ function DashboardContent() {
         data: {
           full_name: fullName.trim(),
           phone: formattedPhone,
+          account_type: accountType,
+          role: accountType,
         }
       });
 
@@ -397,33 +445,6 @@ function DashboardContent() {
     }
   };
 
-  
-  const handleToggleSold = async (listingId: string, currentStatus: string) => {
-    try {
-      const newStatus = currentStatus === "sold" ? "active" : "sold";
-      const rpcName = currentStatus === "sold" ? "reactivate_listing" : "mark_listing_as_sold";
-      
-      setMyListings((prev) =>
-        prev.map((c) => (c.id === listingId ? { ...c, status: newStatus } : c))
-      );
-
-      const { error } = await supabase.rpc(rpcName, { target_listing_id: listingId });
-      if (error) {
-        // Fallback standard update
-        await supabase
-          .from("listings")
-          .update({
-            status: newStatus,
-            sold_at: newStatus === "sold" ? new Date().toISOString() : null,
-          })
-          .eq("id", listingId);
-      }
-    } catch (err) {
-      console.error("Failed to update status:", err);
-      fetchUserData();
-    }
-  };
-  
   const handleDeleteListing = async (listingId: string) => {
     if (!confirm(t('confirmDelete'))) return;
     try {
@@ -479,13 +500,13 @@ function DashboardContent() {
     );
   }
 
-  // Resolve active conversation car details reliably
+  const isDealer = accountType === 'dealer';
   const selectedCar = Array.isArray(selectedConv?.listings) ? selectedConv.listings[0] : selectedConv?.listings;
   const targetListingId = selectedConv?.listing_id || selectedCar?.id;
 
   return (
     <div className="min-h-[85vh] bg-[#f8f9fa] py-8 relative">
-      {/* Sliding In-App Notification Toast */}
+      {/* Sliding Notification Toast */}
       {toast && (
         <div className="fixed top-5 right-5 z-50 max-w-sm w-full bg-white rounded-2xl border-2 border-[#e03a14] p-4 shadow-2xl animate-in slide-in-from-top-5 duration-300">
           <div className="flex items-start gap-3">
@@ -535,9 +556,17 @@ function DashboardContent() {
               {(fullName || user?.email)?.charAt(0).toUpperCase()}
             </div>
             <div>
-              <h1 className="text-lg font-black text-slate-900">
-                {fullName || user?.email}
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-black text-slate-900">
+                  {fullName || user?.email}
+                </h1>
+                {isDealer && (
+                  <span className="bg-orange-50 text-[#e03a14] border border-orange-200 text-[10px] font-black px-2 py-0.5 rounded-md flex items-center gap-1">
+                    <Building2 className="w-3 h-3" />
+                    DEALERSHIP
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-3 mt-0.5 text-xs">
                 <span className="text-emerald-600 font-semibold flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5" />
@@ -554,15 +583,17 @@ function DashboardContent() {
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            
-            <Link
-              href="/dashboard/bulk-upload"
-              className="flex-1 sm:flex-none justify-center bg-slate-900 hover:bg-black text-white text-xs font-bold py-2.5 px-3.5 rounded-xl flex items-center gap-1.5 transition shadow-2xs"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-[#e03a14]" />
-              {t("bulkUploader")}
-            </Link>
-  
+            {/* Dealer Bulk Upload Button ONLY for Dealers */}
+            {isDealer && (
+              <Link
+                href="/dashboard/bulk-upload"
+                className="flex-1 sm:flex-none justify-center bg-slate-900 hover:bg-black text-white text-xs font-bold py-2.5 px-3.5 rounded-xl flex items-center gap-1.5 transition shadow-2xs"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-[#e03a14]" />
+                {t('bulkUploader')}
+              </Link>
+            )}
+
             <Link
               href="/sell"
               className="flex-1 sm:flex-none justify-center bg-[#e03a14] hover:bg-[#c53210] text-white text-xs font-bold py-2.5 px-4 rounded-xl flex items-center gap-1.5 transition shadow-2xs"
@@ -570,6 +601,7 @@ function DashboardContent() {
               <PlusCircle className="w-4 h-4" />
               {t('sellCar')}
             </Link>
+
             <button
               onClick={handleSignOut}
               className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2.5 px-3.5 rounded-xl flex items-center gap-1.5 transition"
@@ -631,7 +663,7 @@ function DashboardContent() {
           </button>
         </div>
 
-        {/* TAB 1: MY CARS */}
+        {/* TAB 1: MY LISTINGS (With Mark as Sold) */}
         {activeTab === 'listings' && (
           <div>
             {myListings.length === 0 ? (
@@ -650,76 +682,81 @@ function DashboardContent() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {myListings.map((car) => (
-                  <div key={car.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs flex flex-col justify-between">
-                    <div>
-                      <div className="relative aspect-[16/10] bg-slate-900">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={car.image_urls?.[0] || '/placeholder-car.jpg'}
-                          alt={car.model}
-                          className="w-full h-full object-cover"
-                        />
-                        {car.status === "sold" ? (
-                          <span className="absolute top-2.5 left-2.5 bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded shadow-2xs tracking-wider">
-                            {t("sold")}
-                          </span>
-                        ) : (
-                          <span className="absolute top-2.5 left-2.5 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-2xs">
-                            {isAr ? "إعلان نشط" : "Active"}
-                          </span>
-                        )}
-                      </div>
-                      <div className="p-4 space-y-1">
-                        <div className="text-base font-black text-[#e03a14]">
-                          {formatPrice(car.price)}
+                {myListings.map((car) => {
+                  const carSold = car.status === 'sold';
+                  return (
+                    <div key={car.id} className={`bg-white rounded-2xl border overflow-hidden shadow-2xs flex flex-col justify-between ${
+                      carSold ? 'border-red-200' : 'border-slate-200'
+                    }`}>
+                      <div>
+                        <div className="relative aspect-[16/10] bg-slate-900">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={car.image_urls?.[0] || '/placeholder-car.jpg'}
+                            alt={car.model}
+                            className={`w-full h-full object-cover ${carSold ? 'brightness-90 grayscale-20' : ''}`}
+                          />
+                          {carSold ? (
+                            <span className="absolute top-2.5 left-2.5 bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded shadow-2xs tracking-wider">
+                              {t('sold')}
+                            </span>
+                          ) : (
+                            <span className="absolute top-2.5 left-2.5 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-2xs">
+                              {isAr ? 'إعلان نشط' : 'Active'}
+                            </span>
+                          )}
                         </div>
-                        <h4 className="font-bold text-slate-900 text-sm">
-                          {car.year} {isAr ? t(car.make) : car.make} {isAr ? t(car.model) : car.model}
-                        </h4>
-                        <p className="text-xs text-slate-400">
-                          {t(car.city || 'Dubai')} • {car.specs}
-                        </p>
+                        <div className="p-4 space-y-1">
+                          <div className={`text-base font-black ${carSold ? 'text-slate-400 line-through' : 'text-[#e03a14]'}`}>
+                            {formatPrice(car.price)}
+                          </div>
+                          <h4 className="font-bold text-slate-900 text-sm">
+                            {car.year} {isAr ? t(car.make) : car.make} {isAr ? t(car.model) : car.model}
+                          </h4>
+                          <p className="text-xs text-slate-400">
+                            {t(car.city || 'Dubai')} • {car.specs}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="p-4 pt-0 border-t border-slate-100 flex items-center justify-between gap-2 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSold(car.id, car.status)}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                            carSold
+                              ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
+                          }`}
+                        >
+                          {carSold ? t('reactivateListing') : t('markAsSold')}
+                        </button>
+
+                        <Link
+                          href={`/listing/${car.id}`}
+                          className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-1 transition"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          {isAr ? 'عرض' : 'View'}
+                        </Link>
+
+                        <button
+                          onClick={() => handleDeleteListing(car.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-xl transition"
+                          title={t('deleteCar')}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
-
-                    <div className="p-4 pt-0 border-t border-slate-100 flex items-center justify-between gap-2 mt-2">
-                      
-                      <button
-                        type="button"
-                        onClick={() => handleToggleSold(car.id, car.status)}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
-                          car.status === "sold"
-                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
-                            : "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
-                        }`}
-                      >
-                        {car.status === "sold" ? t("reactivateListing") : t("markAsSold")}
-                      </button>
-  
-                      <Link
-                        href={`/listing/${car.id}`}
-                        className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-1 transition"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        {isAr ? 'عرض الإعلان' : 'View'}
-                      </Link>
-                      <button
-                        onClick={() => handleDeleteListing(car.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-xl transition"
-                        title={t('deleteCar')}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         )}
 
-        {/* TAB 2: SAVED CARS */}
+        {/* TAB 2: SAVED CARS (With Quick Delete/Unsave Button) */}
         {activeTab === 'saved' && (
           <div>
             {savedListings.length === 0 ? (
@@ -736,17 +773,27 @@ function DashboardContent() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {savedListings.map((car) => (
-                  <ListingCard key={car.id} listing={car} />
+                  <div key={car.id} className="relative group">
+                    <ListingCard listing={car} />
+                    {/* Quick Delete / Unsave Overlay Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleRemoveSavedListing(car.id, e)}
+                      className="absolute top-3 left-3 z-20 bg-white/90 hover:bg-red-600 text-slate-600 hover:text-white p-2 rounded-xl backdrop-blur-md shadow-md transition"
+                      title={isAr ? 'إزالة من المحفوظات' : 'Remove from saved'}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
           </div>
         )}
 
-        {/* TAB 3: REALTIME CHAT & PHOTO ATTACHMENTS */}
+        {/* TAB 3: REALTIME CHAT */}
         {activeTab === 'messages' && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden grid grid-cols-1 md:grid-cols-3 min-h-[580px]">
-            {/* Conversation List */}
             <div className="border-r border-slate-200 bg-slate-50/50 flex flex-col">
               <div className="p-4 border-b border-slate-200 flex items-center justify-between">
                 <span className="font-black text-xs uppercase tracking-wider text-slate-500">
@@ -799,11 +846,9 @@ function DashboardContent() {
               </div>
             </div>
 
-            {/* Live Chat Panel */}
             <div className="md:col-span-2 flex flex-col justify-between bg-white h-[580px]">
               {selectedConv ? (
                 <>
-                  {/* Highly Visible & Clickable Vehicle Header */}
                   <div className="p-3.5 sm:p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 gap-3">
                     {targetListingId ? (
                       <Link
@@ -847,7 +892,6 @@ function DashboardContent() {
                     )}
                   </div>
 
-                  {/* Message History */}
                   <div className="p-4 overflow-y-auto flex-1 space-y-3">
                     {messages.map((m) => {
                       const isMe = m.sender_id === user?.id;
@@ -890,7 +934,6 @@ function DashboardContent() {
                     <div ref={messagesEndRef} />
                   </div>
 
-                  {/* File Preview Bar */}
                   {filePreview && (
                     <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 flex items-center gap-3">
                       <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-slate-300">
@@ -910,7 +953,6 @@ function DashboardContent() {
                     </div>
                   )}
 
-                  {/* Send Form */}
                   <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-100 flex items-center gap-2">
                     <input
                       type="file"
@@ -958,7 +1000,7 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* TAB 4: ACCOUNT SETTINGS */}
+        {/* TAB 4: ACCOUNT SETTINGS (With Account Type / Dealer Switch) */}
         {activeTab === 'account' && (
           <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-lg shadow-2xs space-y-6">
             <div className="flex items-start justify-between gap-3">
@@ -1070,19 +1112,46 @@ function DashboardContent() {
                 </div>
               </div>
 
-              {isLocked ? (
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-500 leading-relaxed">
-                  <span className="font-semibold text-slate-700 block mb-0.5">
-                    {isAr ? 'هل تحتاج إلى تغيير رقم هاتفك أو اسمك؟' : 'Need to update your verified credentials?'}
-                  </span>
-                  {isAr 
-                    ? 'لحماية المشترين ومصداقية الإعلانات، يرجى التواصل مع فريق الدعم على ' 
-                    : 'To protect buyers and listings integrity, please contact support at '}
-                  <a href="mailto:support@memycar.com" className="text-[#e03a14] font-bold underline">
-                    support@memycar.com
-                  </a>
+              {/* Account Type Selector (Dealer vs Private) */}
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  {isAr ? 'نوع الحساب (فردي أو معرض سيارات)' : 'Account Type (Private or Commercial Dealer)'}
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAccountType('private')}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                      accountType === 'private'
+                        ? 'bg-slate-900 text-white border-slate-900'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <UserIcon className="w-3.5 h-3.5" />
+                    <span>{isAr ? 'بائع فردي' : 'Private Seller'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAccountType('dealer')}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                      accountType === 'dealer'
+                        ? 'bg-[#e03a14] text-white border-[#e03a14]'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span>{isAr ? 'معرض سيارات' : 'Car Dealership'}</span>
+                  </button>
                 </div>
-              ) : (
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {accountType === 'dealer'
+                    ? (isAr ? 'حساب المعارض يفعل ميزة الرفع الجماعي للسيارات عبر ملف Excel/CSV.' : 'Dealership accounts enable bulk CSV fleet inventory uploads.')
+                    : (isAr ? 'حساب بائع فردي عادي.' : 'Standard individual seller profile.')}
+                </p>
+              </div>
+
+              {!isLocked ? (
                 <button
                   type="submit"
                   disabled={profileSaving}
@@ -1090,6 +1159,15 @@ function DashboardContent() {
                 >
                   {profileSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   {isAr ? 'حفظ وتثبيت البيانات' : 'Save & Lock Details'}
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={profileSaving}
+                  className="bg-slate-800 hover:bg-black disabled:bg-slate-300 text-white text-xs font-bold py-2 px-4 rounded-xl transition flex items-center justify-center gap-1.5"
+                >
+                  {profileSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {isAr ? 'تحديث نوع الحساب' : 'Update Account Type'}
                 </button>
               )}
 

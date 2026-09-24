@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Listing } from '@/types/listing';
 import { useLanguage } from '@/context/LanguageContext';
 import { createClient } from '@/lib/supabase/client';
-import { Phone, MessageSquare, Gauge, Eye, Clock, Loader2 } from 'lucide-react';
+import { Phone, MessageSquare, Gauge, Eye, Clock, Loader2, CheckCircle2 } from 'lucide-react';
 
 export default function ListingCard({ listing }: { listing: Listing }) {
   const router = useRouter();
@@ -14,6 +14,7 @@ export default function ListingCard({ listing }: { listing: Listing }) {
   const { t, formatPrice, formatMileage, isAr } = useLanguage();
   const [chatStarting, setChatStarting] = useState(false);
 
+  const isSold = (listing as any).status === 'sold';
   const price = (listing as any).price ?? (listing as any).price_aed ?? 0;
   const mileage = (listing as any).mileage ?? (listing as any).mileage_km ?? 0;
   const specs = (listing as any).specs || 'GCC Specs';
@@ -46,6 +47,8 @@ export default function ListingCard({ listing }: { listing: Listing }) {
     e.preventDefault();
     e.stopPropagation();
 
+    if (isSold) return;
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       router.push('/auth');
@@ -61,12 +64,10 @@ export default function ListingCard({ listing }: { listing: Listing }) {
     setChatStarting(true);
     try {
       if (!sellerId) {
-        // If listing has no user_id, route to car page
         router.push(`/listing/${listing.id}`);
         return;
       }
 
-      // 1. Look for existing conversation
       const { data: existing } = await supabase
         .from('conversations')
         .select('id')
@@ -76,7 +77,6 @@ export default function ListingCard({ listing }: { listing: Listing }) {
 
       let conversationId = existing?.id;
 
-      // 2. Create conversation if it doesn't exist
       if (!conversationId) {
         const greeting = isAr ? 'مرحبا، هل هذه السيارة ما زالت متوفرة؟' : 'Hi, is this vehicle still available?';
         const { data: created, error: createErr } = await supabase
@@ -110,7 +110,9 @@ export default function ListingCard({ listing }: { listing: Listing }) {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition flex flex-col justify-between group">
+    <div className={`bg-white rounded-2xl border overflow-hidden shadow-xs hover:shadow-md transition flex flex-col justify-between group ${
+      isSold ? 'border-red-200 opacity-90' : 'border-slate-200'
+    }`}>
       <div>
         {/* Cover Photo */}
         <Link href={`/listing/${listing.id}`} className="block relative aspect-[16/10] bg-slate-900 overflow-hidden">
@@ -118,14 +120,26 @@ export default function ListingCard({ listing }: { listing: Listing }) {
           <img
             src={coverImage}
             alt={`${make} ${model}`}
-            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+            className={`w-full h-full object-cover transition duration-300 ${
+              isSold ? 'grayscale-25 brightness-90' : 'group-hover:scale-105'
+            }`}
           />
+
+          {/* Regional Spec Pill */}
           <span className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded">
             {t(specs)}
           </span>
-          <span className="absolute top-2.5 right-2.5 bg-white/90 text-slate-800 text-[10px] font-extrabold px-2 py-0.5 rounded">
-            {listing.year}
-          </span>
+
+          {/* SOLD Badge or Year */}
+          {isSold ? (
+            <span className="absolute top-2.5 right-2.5 bg-red-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded shadow-md tracking-wider">
+              {t('sold')}
+            </span>
+          ) : (
+            <span className="absolute top-2.5 right-2.5 bg-white/90 text-slate-800 text-[10px] font-extrabold px-2 py-0.5 rounded">
+              {listing.year}
+            </span>
+          )}
 
           {/* View Count & Upload Date Badge */}
           <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/65 backdrop-blur-md text-white text-[10px] font-semibold px-2 py-0.5 rounded-md">
@@ -144,8 +158,15 @@ export default function ListingCard({ listing }: { listing: Listing }) {
         {/* Info */}
         <div className="p-4 space-y-2">
           {/* Price */}
-          <div className="text-lg font-black text-[#e03a14]">
-            {formatPrice(price)}
+          <div className="flex items-center justify-between">
+            <div className={`text-lg font-black ${isSold ? 'text-slate-500 line-through' : 'text-[#e03a14]'}`}>
+              {formatPrice(price)}
+            </div>
+            {isSold && (
+              <span className="text-[10px] font-black text-red-600 uppercase bg-red-50 px-2 py-0.5 rounded">
+                {t('sold')}
+              </span>
+            )}
           </div>
 
           {/* Title */}
@@ -165,7 +186,6 @@ export default function ListingCard({ listing }: { listing: Listing }) {
             <span className="truncate">{t(specs)}</span>
           </div>
 
-          {/* Description snippet */}
           {(listing as any).description && (
             <p className="text-[11px] text-slate-400 line-clamp-2 pt-0.5">
               {(listing as any).description}
@@ -174,37 +194,46 @@ export default function ListingCard({ listing }: { listing: Listing }) {
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="p-4 pt-0 grid grid-cols-2 gap-2 mt-2">
-        <button
-          type="button"
-          disabled={chatStarting}
-          onClick={handleMessageSeller}
-          className="bg-slate-900 hover:bg-black text-white py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs transition"
-        >
-          {chatStarting ? (
-            <Loader2 className="w-3 h-3 animate-spin" />
-          ) : (
-            <MessageSquare className="w-3 h-3 text-[#e03a14]" />
-          )}
-          {t('messageSeller')}
-        </button>
-
-        {phone ? (
-          <a
-            href={`tel:${phone}`}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs transition"
-          >
-            <Phone className="w-3 h-3" />
-            {isAr ? 'اتصال بالبائع' : 'Call Seller'}
-          </a>
+      {/* Action Buttons: Completely disabled if SOLD */}
+      <div className="p-4 pt-0 mt-2">
+        {isSold ? (
+          <div className="w-full bg-slate-100 border border-slate-200 text-slate-500 py-2.5 px-3 rounded-xl text-xs font-black text-center flex items-center justify-center gap-1.5 uppercase tracking-wider">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>{t('sold')} — Contact Closed</span>
+          </div>
         ) : (
-          <Link
-            href={`/listing/${listing.id}`}
-            className="bg-[#e03a14] hover:bg-[#c53210] text-white py-2 px-2 rounded-xl text-[11px] font-bold text-center transition"
-          >
-            {isAr ? 'عرض التفاصيل' : 'View Details'}
-          </Link>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={chatStarting}
+              onClick={handleMessageSeller}
+              className="bg-slate-900 hover:bg-black text-white py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs transition"
+            >
+              {chatStarting ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <MessageSquare className="w-3 h-3 text-[#e03a14]" />
+              )}
+              {t('messageSeller')}
+            </button>
+
+            {phone ? (
+              <a
+                href={`tel:${phone}`}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs transition"
+              >
+                <Phone className="w-3 h-3" />
+                {isAr ? 'اتصال بالبائع' : 'Call Seller'}
+              </a>
+            ) : (
+              <Link
+                href={`/listing/${listing.id}`}
+                className="bg-[#e03a14] hover:bg-[#c53210] text-white py-2 px-2 rounded-xl text-[11px] font-bold text-center transition"
+              >
+                {isAr ? 'عرض التفاصيل' : 'View Details'}
+              </Link>
+            )}
+          </div>
         )}
       </div>
     </div>
