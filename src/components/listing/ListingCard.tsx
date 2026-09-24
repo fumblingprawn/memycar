@@ -1,5 +1,6 @@
 'use client';
 
+import ProtectedPhoneButton from "@/components/ui/ProtectedPhoneButton";
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -220,13 +221,7 @@ export default function ListingCard({ listing }: { listing: Listing }) {
             </button>
 
             {phone ? (
-              <a
-                href={`tel:${phone}`}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs transition"
-              >
-                <Phone className="w-3 h-3" />
-                {isAr ? 'اتصال بالبائع' : 'Call Seller'}
-              </a>
+              <ProtectedPhoneButton phone={phone} variant="card" className="w-full" />
             ) : (
               <Link
                 href={`/listing/${listing.id}`}

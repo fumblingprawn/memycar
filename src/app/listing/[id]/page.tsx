@@ -1,5 +1,6 @@
 'use client';
 
+import ProtectedPhoneButton from "@/components/ui/ProtectedPhoneButton";
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -502,13 +503,7 @@ return (
                   </div>
 
                   {phone ? (
-                    <a
-                      href={`tel:${phone}`}
-                      className="w-full bg-[#e03a14] hover:bg-[#c53210] text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow transition text-sm"
-                    >
-                      <Phone className="w-4 h-4" />
-                      {t('call')} {phone}
-                    </a>
+                    <ProtectedPhoneButton phone={phone} variant="detail" />
                   ) : (
                     <button disabled className="w-full bg-slate-200 text-slate-400 py-3 px-4 rounded-xl font-bold text-sm">
                       {t('phoneNotAvailable')}
