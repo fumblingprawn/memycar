@@ -1,26 +1,36 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { usePathname } from 'next/navigation';
 import { useLanguage } from '@/context/LanguageContext';
-import { User, LogIn, LayoutDashboard, Plus } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { 
+  PlusCircle, 
+  Search, 
+  LayoutDashboard, 
+  LogIn, 
+  Menu, 
+  X, 
+  Globe
+} from 'lucide-react';
 
 export default function Header() {
-  const router = useRouter();
+  const pathname = usePathname();
   const supabase = createClient();
-  const { t, toggleLanguage, isAr, locale } = useLanguage();
+  const { t, locale, toggleLanguage, isAr } = useLanguage();
+
   const [user, setUser] = useState<any>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    // 1. Get initial session
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data?.user ?? null);
-    });
+    async function checkAuth() {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    }
+    checkAuth();
 
-    // 2. Listen to login/logout events in real-time
-    const { data: authListener } = supabase.auth.onAuthStateChange((_, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
@@ -29,70 +39,154 @@ export default function Header() {
     };
   }, [supabase]);
 
-  return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        {/* Brand Logo */}
-        <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl font-black text-slate-900 tracking-tight">
-              memycar<span className="text-[#e03a14]">.com</span>
-            </span>
-          </Link>
-          <span className="text-[10px] font-bold uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
-            UAE
-          </span>
-        </div>
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
 
-        {/* Right Navigation Actions */}
-        <div className="flex items-center gap-2.5 sm:gap-3">
-          {/* Search Shortcut */}
+  return (
+    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 gap-2">
+          {/* Brand Logo */}
+          <div className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-1.5 group">
+              <span className="font-black text-xl tracking-tight text-slate-900 group-hover:text-[#e03a14] transition">
+                memycar<span className="text-[#e03a14]">.com</span>
+              </span>
+              <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-1.5 py-0.5 rounded border border-slate-200">
+                UAE
+              </span>
+            </Link>
+          </div>
+
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center gap-4">
+            <Link
+              href="/search"
+              className="text-xs font-bold text-slate-700 hover:text-[#e03a14] transition flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-slate-50"
+            >
+              <Search className="w-3.5 h-3.5 text-slate-400" />
+              {t('search')}
+            </Link>
+
+            <Link
+              href="/sell"
+              className="bg-[#e03a14] hover:bg-[#c53210] text-white text-xs font-bold py-2 px-3.5 rounded-xl transition flex items-center gap-1.5 shadow-2xs"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              {t('sellCar')}
+            </Link>
+
+            {user ? (
+              <Link
+                href="/dashboard"
+                className="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-2 px-3.5 rounded-xl transition flex items-center gap-1.5"
+              >
+                <LayoutDashboard className="w-3.5 h-3.5 text-slate-500" />
+                {t('myDashboard')}
+              </Link>
+            ) : (
+              <Link
+                href="/auth"
+                className="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-2 px-3.5 rounded-xl transition flex items-center gap-1.5"
+              >
+                <LogIn className="w-3.5 h-3.5 text-slate-500" />
+                {t('login')}
+              </Link>
+            )}
+
+            <button
+              type="button"
+              onClick={toggleLanguage}
+              className="text-xs font-bold text-slate-700 hover:text-[#e03a14] py-1.5 px-2.5 rounded-lg border border-slate-200 hover:border-slate-300 transition flex items-center gap-1"
+            >
+              <Globe className="w-3.5 h-3.5 text-slate-400" />
+              <span>{locale === 'en' ? 'العربية' : 'English'}</span>
+            </button>
+          </nav>
+
+          {/* Mobile Right Controls: Compact Language Pill + Sell + Hamburger */}
+          <div className="flex md:hidden items-center gap-2">
+            <Link
+              href="/sell"
+              className="bg-[#e03a14] text-white text-[11px] font-bold py-1.5 px-2.5 rounded-lg flex items-center gap-1 shadow-2xs"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>{isAr ? 'بيع' : 'Sell'}</span>
+            </Link>
+
+            <button
+              type="button"
+              onClick={toggleLanguage}
+              className="bg-slate-100 active:bg-slate-200 text-slate-800 text-[11px] font-bold py-1.5 px-2 rounded-lg border border-slate-200 flex items-center gap-1"
+            >
+              <Globe className="w-3 h-3 text-[#e03a14]" />
+              <span>{locale === 'en' ? 'عربي' : 'EN'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-1.5 text-slate-700 hover:bg-slate-100 rounded-lg transition"
+              aria-label="Toggle Navigation Menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Dropdown Drawer */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t border-slate-200 bg-white px-4 pt-3 pb-5 space-y-3 shadow-xl animate-in slide-in-from-top-2 duration-150">
           <Link
             href="/search"
-            className="text-xs font-semibold text-slate-600 hover:text-slate-900 px-2.5 py-1.5 rounded-lg hover:bg-slate-50 transition"
+            className="flex items-center gap-2.5 py-2.5 px-3 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
           >
+            <Search className="w-4 h-4 text-[#e03a14]" />
             {t('search')}
           </Link>
 
-          {/* Sell Car CTA */}
           <Link
             href="/sell"
-            className="bg-[#e03a14] hover:bg-[#c53210] text-white text-xs font-bold py-2 px-3.5 rounded-xl transition flex items-center gap-1.5 shadow-sm"
+            className="flex items-center gap-2.5 py-2.5 px-3 rounded-xl text-xs font-bold text-[#e03a14] bg-orange-50 border border-orange-100 transition"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>{t('sellCar')}</span>
+            <PlusCircle className="w-4 h-4" />
+            {t('sellCar')}
           </Link>
 
-          {/* Auth Button: Login OR Dashboard */}
           {user ? (
             <Link
               href="/dashboard"
-              className="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-2 px-3 rounded-xl transition flex items-center gap-1.5 border border-slate-200"
+              className="flex items-center gap-2.5 py-2.5 px-3 rounded-xl text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 transition"
             >
-              <LayoutDashboard className="w-3.5 h-3.5 text-[#e03a14]" />
-              <span className="hidden sm:inline">{t('dashboard')}</span>
+              <LayoutDashboard className="w-4 h-4 text-slate-500" />
+              {t('myDashboard')}
             </Link>
           ) : (
             <Link
               href="/auth"
-              className="border border-slate-300 hover:border-slate-400 text-slate-700 text-xs font-bold py-2 px-3 rounded-xl transition flex items-center gap-1.5 bg-white shadow-2xs"
+              className="flex items-center gap-2.5 py-2.5 px-3 rounded-xl text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 transition"
             >
-              <LogIn className="w-3.5 h-3.5 text-slate-500" />
-              <span>{t('login')}</span>
+              <LogIn className="w-4 h-4 text-slate-500" />
+              {t('login')}
             </Link>
           )}
 
-          {/* Language Switcher Pill */}
-          <button
-            type="button"
-            onClick={toggleLanguage}
-            className="border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold py-1.5 px-2.5 rounded-xl transition flex items-center gap-1"
-          >
-            <span>{isAr ? 'English' : 'العربية'}</span>
-            <span className="text-[11px]">🌐</span>
-          </button>
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span className="font-semibold">{isAr ? 'اللغة' : 'Language'}</span>
+            <button
+              type="button"
+              onClick={toggleLanguage}
+              className="font-bold text-[#e03a14] hover:underline flex items-center gap-1"
+            >
+              <Globe className="w-3.5 h-3.5" />
+              {locale === 'en' ? 'العربية (AR)' : 'English (EN)'}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </header>
   );
 }

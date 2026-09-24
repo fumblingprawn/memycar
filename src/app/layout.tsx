@@ -27,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <html
         className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       >
-        <body className="min-h-full flex flex-col">
+        <body className="overflow-x-hidden" className="min-h-full flex flex-col">
           <Header />
           <main className="flex-grow">
             <Suspense fallback={<div>Loading...</div>}>
