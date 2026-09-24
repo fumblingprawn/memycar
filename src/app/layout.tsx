@@ -17,8 +17,25 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "memycar",
-  description: "UAE's trusted car marketplace",
+  title: {
+    default: "memycar | Verified Pre-Owned & Luxury Cars in UAE",
+    template: "%s | memycar.com"
+  },
+  description: "Explore verified pre-owned, luxury and GCC spec cars for sale in Dubai, Abu Dhabi and across the UAE. Direct owner messaging, dealer inventories, and zero hidden fees.",
+  keywords: ["used cars dubai", "cars for sale uae", "gcc specs cars", "luxury cars dubai", "memycar", "buy car dubai"],
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
+  openGraph: {
+    title: "memycar | Verified Pre-Owned Cars in UAE",
+    description: "Browse handpicked, verified GCC & pre-owned cars for sale in Dubai and UAE with direct seller messaging.",
+    url: "https://memycar.com",
+    siteName: "memycar.com",
+    locale: "en_AE",
+    type: "website",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

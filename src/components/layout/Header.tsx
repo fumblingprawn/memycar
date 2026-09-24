@@ -1,3 +1,4 @@
+import Logo from "@/components/ui/Logo";
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -50,14 +51,7 @@ export default function Header() {
         <div className="flex items-center justify-between h-16 gap-2">
           {/* Brand Logo */}
           <div className="flex items-center gap-2">
-            <Link href="/" className="flex items-center gap-1.5 group">
-              <span className="font-black text-xl tracking-tight text-slate-900 group-hover:text-[#e03a14] transition">
-                memycar<span className="text-[#e03a14]">.com</span>
-              </span>
-              <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-1.5 py-0.5 rounded border border-slate-200">
-                UAE
-              </span>
-            </Link>
+            <Logo size="md" />
           </div>
 
           {/* Desktop Navigation */}
