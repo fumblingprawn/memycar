@@ -58,21 +58,21 @@ export default function AuthPage() {
           return;
         }
 
-        // 2. UAE Phone Number Format Validation
-        const cleanPhone = phone.replace(/[\s-]/g, '');
-        const uaePhoneRegex = /^(?:\+971|00971|0)?5[024568]\d{7}$/;
+        // 2. UAE Phone Number Validation (Fixed +971 + 9 Digits)
+        const digits = phone.replace(/\D/g, '');
+        const uaeRegex = /^5[024568]\d{7}$/;
 
-        if (!uaePhoneRegex.test(cleanPhone)) {
+        if (!uaeRegex.test(digits)) {
           setErrorMsg(
             isAr
-              ? 'يرجى إدخال رقم هاتف إماراتي متحرك صحيح (مثال: 0501234567 أو +971501234567)'
-              : 'Please enter a valid UAE mobile number (e.g., +971 50 123 4567 or 050 123 4567)'
+              ? 'يرجى إدخال 9 أرقام تبدأ بـ 5 (مثال: 501234567)'
+              : 'Please enter 9 digits starting with 5 (e.g. 50 123 4567)'
           );
           setLoading(false);
           return;
         }
 
-        let formattedPhone = cleanPhone;
+        let formattedPhone = '+971' + digits;
         if (formattedPhone.startsWith('05')) {
           formattedPhone = '+971' + formattedPhone.slice(1);
         } else if (!formattedPhone.startsWith('+')) {
@@ -217,21 +217,30 @@ export default function AuthPage() {
                 <label className="text-xs font-semibold text-slate-700 block mb-1">
                   {isAr ? 'رقم الهاتف / الواتساب في الإمارات *' : 'UAE Phone / WhatsApp *'}
                 </label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <div className="flex items-center rounded-xl border border-slate-300 overflow-hidden focus-within:ring-2 focus-within:ring-[#e03a14] focus-within:border-transparent bg-white">
+                  <span className="bg-slate-100 text-slate-700 font-mono font-semibold px-3 py-2.5 text-sm border-r border-slate-200 select-none flex items-center gap-1.5 shrink-0">
+                    🇦🇪 +971
+                  </span>
                   <input
                     required
                     type="tel"
                     dir="ltr"
-                    placeholder="+971 50 123 4567 or 0501234567"
+                    maxLength={9}
+                    placeholder="50 123 4567"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14]"
+                    onChange={(e) => {
+                      let val = e.target.value.replace(/\D/g, '');
+                      if (val.startsWith('971')) val = val.slice(3);
+                      if (val.startsWith('0')) val = val.slice(1);
+                      setPhone(val.slice(0, 9));
+                    }}
+                    className="w-full px-3 py-2.5 text-sm outline-none font-mono bg-transparent tracking-wide text-slate-900"
                   />
                 </div>
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  {isAr ? 'أرقام الهواتف المعتمدة: 050، 052، 054، 055، 056، 058' : 'Valid UAE carriers: 050, 052, 054, 055, 056, 058'}
-                </span>
+                <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1 px-1">
+                  <span>{isAr ? 'أدخل 9 أرقام تبدأ بـ 5' : 'Enter 9 digits starting with 5'}</span>
+                  <span className="font-mono">{phone.length}/9</span>
+                </div>
               </div>
             </>
           )}
