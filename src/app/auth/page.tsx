@@ -17,6 +17,15 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+// Helper to sanitize and normalize UAE phone input
+function cleanUaeInput(val: string): string {
+  let raw = val.replace(/\D/g, '');
+  if (raw.startsWith('00971')) raw = raw.slice(5);
+  else if (raw.startsWith('971')) raw = raw.slice(3);
+  if (raw.startsWith('0')) raw = raw.slice(1);
+  return raw.slice(0, 9);
+}
+
 export default function AuthPage() {
   const router = useRouter();
   const supabase = createClient();
