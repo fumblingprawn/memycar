@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
-import { carData, years } from '@/lib/constants/car-data';
+import { carData, years, SubModelGroup } from '@/lib/constants/car-data';
 import ListingCard from '@/components/listing/ListingCard';
 import { 
   Car, 
@@ -12,7 +12,8 @@ import {
   ArrowUpDown, 
   RotateCcw, 
   X, 
-  Filter
+  Filter,
+  CheckCircle2
 } from 'lucide-react';
 
 type SortOption = 
@@ -47,13 +48,20 @@ function SearchContent() {
   const [maxMileage, setMaxMileage] = useState(searchParams.get('mileage_to') || '');
   const [emirate, setEmirate] = useState(searchParams.get('emirate') || '');
   const [specs, setSpecs] = useState(searchParams.get('specs') || '');
+  const [fuelType, setFuelType] = useState(searchParams.get('fuel') || '');
+  const [transmission, setTransmission] = useState(searchParams.get('trans') || '');
+  const [warrantyOnly, setWarrantyOnly] = useState(searchParams.get('warranty') === 'yes');
+  const [serviceContractOnly, setServiceContractOnly] = useState(searchParams.get('service_contract') === 'yes');
+  const [showSold, setShowSold] = useState(false);
 
   const emirateOptions = ['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain'];
-  const specsOptions = ['GCC Specs', 'Non-GCC / American', 'Non-GCC / Japanese', 'Non-GCC / European'];
+  const specsOptions = ['GCC Specs', 'Non-GCC / American', 'Non-GCC / Japanese', 'Non-GCC / European', 'Other'];
+  const fuelOptions = ['Petrol', 'Diesel', 'Hybrid', 'Electric'];
+  const transOptions = ['Automatic', 'Manual'];
 
-  const availableModels = make && make !== 'Other'
-    ? carData.makes.find((m) => m.make.toLowerCase() === make.toLowerCase())?.models || []
-    : [];
+  const selectedMakeObj = make && make !== 'Other'
+    ? carData.makes.find((m) => m.make.toLowerCase() === make.toLowerCase())
+    : null;
 
   const handleMakeChange = (selectedMake: string) => {
     setMake(selectedMake);
@@ -70,16 +78,35 @@ function SearchContent() {
     setMaxMileage('');
     setEmirate('');
     setSpecs('');
+    setFuelType('');
+    setTransmission('');
+    setWarrantyOnly(false);
+    setServiceContractOnly(false);
+    setShowSold(false);
     setSortBy('default');
     router.push('/search');
   };
 
   const fetchResults = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from('listings').select('*').neq('status', 'archived');
+    let query = supabase.from('listings').select('*');
+
+    // Filter out archived listings
+    query = query.neq('status', 'archived');
+
+    // If user does not want to see sold listings, only show active
+    if (!showSold) {
+      query = query.neq('status', 'sold');
+    }
 
     if (make && make !== 'Other') query = query.ilike('make', `%${make}%`);
-    if (model && model !== 'Other') query = query.ilike('model', `%${model}%`);
+    
+    // Model search: if user selected a series like "7 Series (All)", match "7 Series" or "7"
+    if (model && model !== 'Other') {
+      const cleanModel = model.replace(/\s*\(All\)|\s*\(الكل\)/i, '').trim();
+      query = query.ilike('model', `%${cleanModel}%`);
+    }
+
     if (yearFrom) query = query.gte('year', parseInt(yearFrom, 10));
     if (yearTo) query = query.lte('year', parseInt(yearTo, 10));
     if (priceFrom) query = query.gte('price', parseInt(priceFrom, 10));
@@ -87,8 +114,12 @@ function SearchContent() {
     if (maxMileage) query = query.lte('mileage', parseInt(maxMileage, 10));
     if (emirate) query = query.ilike('city', `%${emirate}%`);
     if (specs) query = query.ilike('specs', `%${specs}%`);
+    if (fuelType) query = query.ilike('fuel_type', `%${fuelType}%`);
+    if (transmission) query = query.ilike('transmission', `%${transmission}%`);
+    if (warrantyOnly) query = query.eq('warranty', 'Yes');
+    if (serviceContractOnly) query = query.eq('service_contract', 'Yes');
 
-    // Dubizzle-Style Sorting Logic
+    // Dubizzle sorting
     switch (sortBy) {
       case 'newest':
         query = query.order('created_at', { ascending: false });
@@ -116,7 +147,6 @@ function SearchContent() {
         break;
       case 'default':
       default:
-        // Default: featured/newest first
         query = query.order('created_at', { ascending: false });
         break;
     }
@@ -126,7 +156,24 @@ function SearchContent() {
       setListings(data);
     }
     setLoading(false);
-  }, [supabase, make, model, yearFrom, yearTo, priceFrom, priceTo, maxMileage, emirate, specs, sortBy]);
+  }, [
+    supabase, 
+    make, 
+    model, 
+    yearFrom, 
+    yearTo, 
+    priceFrom, 
+    priceTo, 
+    maxMileage, 
+    emirate, 
+    specs, 
+    fuelType, 
+    transmission, 
+    warrantyOnly, 
+    serviceContractOnly, 
+    showSold, 
+    sortBy
+  ]);
 
   useEffect(() => {
     fetchResults();
@@ -134,12 +181,12 @@ function SearchContent() {
 
   const FilterControls = () => (
     <div className="space-y-5">
-      <div className="flex items-center justify-between pb-3 border-b border-slate-100 text-slate-900">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
         <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
           <Filter className="w-3.5 h-3.5 text-[#e03a14]" />
           {isAr ? 'تصفية النتائج' : 'Filter Search'}
         </h2>
-        {(make || model || yearFrom || yearTo || priceFrom || priceTo || maxMileage || emirate || specs) && (
+        {(make || model || yearFrom || yearTo || priceFrom || priceTo || maxMileage || emirate || specs || fuelType || transmission || warrantyOnly || serviceContractOnly || showSold) && (
           <button
             type="button"
             onClick={handleResetFilters}
@@ -153,11 +200,11 @@ function SearchContent() {
 
       {/* Make */}
       <div>
-        <label className="text-xs font-semibold text-slate-700 block mb-1.5">{t('make')}</label>
+        <label className="text-xs font-bold text-slate-900 block mb-1.5">{t('make')}</label>
         <select
           value={make}
           onChange={(e) => handleMakeChange(e.target.value)}
-          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14] text-slate-900"
+          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
         >
           <option value="">{t('allMakes')}</option>
           {carData.makes.map((item) => (
@@ -168,32 +215,53 @@ function SearchContent() {
         </select>
       </div>
 
-      {/* Model */}
+      {/* Model: Mobile.de / Dubizzle-style Grouped Dropdown */}
       <div>
-        <label className="text-xs font-semibold text-slate-700 block mb-1.5">{t('model')}</label>
+        <label className="text-xs font-bold text-slate-900 block mb-1.5">{t('model')}</label>
         <select
-          disabled={!make || availableModels.length === 0}
+          disabled={!make || !selectedMakeObj}
           value={model}
           onChange={(e) => setModel(e.target.value)}
-          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14] disabled:bg-slate-100 disabled:text-slate-400 text-slate-900"
+          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14] disabled:bg-slate-100 disabled:text-slate-400"
         >
-          <option value="">{make ? t('allModels') : t('selectMakeFirst')}</option>
-          {availableModels.map((mod) => (
-            <option key={mod} value={mod}>
-              {isAr ? t(mod) : mod}
-            </option>
-          ))}
+          <option value="">{make ? (isAr ? 'كافة الموديلات' : 'All Models') : t('selectMakeFirst')}</option>
+          {selectedMakeObj?.models.map((item, idx) => {
+            if (typeof item === 'string') {
+              return (
+                <option key={idx} value={item}>
+                  {item}
+                </option>
+              );
+            } else {
+              // Grouped Series like mobile.de
+              const group = item as SubModelGroup;
+              return (
+                <optgroup key={group.groupName} label={`— ${group.groupName} —`}>
+                  {/* "All" Option for the entire series */}
+                  <option value={`${group.groupName} (All)`}>
+                    {isAr ? `${group.groupName} (كافة الفئات)` : `${group.groupName} (All)`}
+                  </option>
+                  {/* Individual submodels */}
+                  {group.models.map((sub) => (
+                    <option key={sub} value={sub}>
+                      &nbsp;&nbsp;&nbsp;{sub}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            }
+          })}
         </select>
       </div>
 
       {/* Year Range */}
       <div>
-        <label className="text-xs font-semibold text-slate-700 block mb-1.5">{t('year')}</label>
+        <label className="text-xs font-bold text-slate-900 block mb-1.5">{t('year')}</label>
         <div className="grid grid-cols-2 gap-2">
           <select
             value={yearFrom}
             onChange={(e) => setYearFrom(e.target.value)}
-            className="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14] text-slate-900"
+            className="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
           >
             <option value="">{isAr ? 'من سنة' : 'From'}</option>
             {years.map((y) => (
@@ -203,7 +271,7 @@ function SearchContent() {
           <select
             value={yearTo}
             onChange={(e) => setYearTo(e.target.value)}
-            className="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14] text-slate-900"
+            className="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
           >
             <option value="">{isAr ? 'إلى سنة' : 'To'}</option>
             {years.map((y) => (
@@ -215,65 +283,128 @@ function SearchContent() {
 
       {/* Price Range */}
       <div>
-        <label className="text-xs font-semibold text-slate-700 block mb-1.5">{t('priceAed')}</label>
+        <label className="text-xs font-bold text-slate-900 block mb-1.5">{t('priceAed')}</label>
         <div className="grid grid-cols-2 gap-2">
           <input
             type="number"
             placeholder={isAr ? 'الحد الأدنى' : 'Min AED'}
             value={priceFrom}
             onChange={(e) => setPriceFrom(e.target.value)}
-            className="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14] text-slate-900"
+            className="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-300 text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
           />
           <input
             type="number"
             placeholder={isAr ? 'الحد الأقصى' : 'Max AED'}
             value={priceTo}
             onChange={(e) => setPriceTo(e.target.value)}
-            className="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14] text-slate-900"
+            className="w-full px-2.5 py-2 text-xs rounded-xl border border-slate-300 text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
           />
         </div>
       </div>
 
       {/* Max Mileage */}
       <div>
-        <label className="text-xs font-semibold text-slate-700 block mb-1.5">{t('mileageKm')}</label>
+        <label className="text-xs font-bold text-slate-900 block mb-1.5">{t('mileageKm')}</label>
         <input
           type="number"
           placeholder={isAr ? 'أقصى مسافة (كم)' : 'Max KM (e.g. 100000)'}
           value={maxMileage}
           onChange={(e) => setMaxMileage(e.target.value)}
-          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-[#e03a14] text-slate-900"
+          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
         />
       </div>
 
       {/* Regional Specs */}
       <div>
-        <label className="text-xs font-semibold text-slate-700 block mb-1.5">{t('specs')}</label>
+        <label className="text-xs font-bold text-slate-900 block mb-1.5">{t('specs')}</label>
         <select
           value={specs}
           onChange={(e) => setSpecs(e.target.value)}
-          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14] text-slate-900"
+          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
         >
           <option value="">{t('allSpecs')}</option>
           {specsOptions.map((opt) => (
-            <option key={opt} value={opt}>{t(opt)}</option>
+            <option key={opt} value={opt}>{opt === 'Other' ? (isAr ? 'أخرى' : 'Other') : t(opt)}</option>
           ))}
         </select>
       </div>
 
       {/* Emirate */}
       <div>
-        <label className="text-xs font-semibold text-slate-700 block mb-1.5">{t('emirate')}</label>
+        <label className="text-xs font-bold text-slate-900 block mb-1.5">{t('emirate')}</label>
         <select
           value={emirate}
           onChange={(e) => setEmirate(e.target.value)}
-          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14] text-slate-900"
+          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
         >
           <option value="">{t('allEmirates')}</option>
           {emirateOptions.map((em) => (
             <option key={em} value={em}>{t(em)}</option>
           ))}
         </select>
+      </div>
+
+      {/* Technical: Fuel Type */}
+      <div>
+        <label className="text-xs font-bold text-slate-900 block mb-1.5">{t('fuelType')}</label>
+        <select
+          value={fuelType}
+          onChange={(e) => setFuelType(e.target.value)}
+          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
+        >
+          <option value="">{isAr ? 'كافة أنواع الوقود' : 'All Fuel Types'}</option>
+          {fuelOptions.map((f) => (
+            <option key={f} value={f}>{t(f)}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Technical: Transmission */}
+      <div>
+        <label className="text-xs font-bold text-slate-900 block mb-1.5">{t('transmission')}</label>
+        <select
+          value={transmission}
+          onChange={(e) => setTransmission(e.target.value)}
+          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
+        >
+          <option value="">{isAr ? 'كافة نواقل الحركة' : 'All Transmissions'}</option>
+          {transOptions.map((tr) => (
+            <option key={tr} value={tr}>{t(tr)}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Checkboxes: Under Warranty & Service Contract */}
+      <div className="pt-2 border-t border-slate-100 space-y-2">
+        <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-800">
+          <input
+            type="checkbox"
+            checked={warrantyOnly}
+            onChange={(e) => setWarrantyOnly(e.target.checked)}
+            className="w-4 h-4 rounded text-[#e03a14] focus:ring-[#e03a14] border-slate-300"
+          />
+          <span>{isAr ? 'سيارات تحت الضمان فقط' : 'Under Warranty only'}</span>
+        </label>
+
+        <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-800">
+          <input
+            type="checkbox"
+            checked={serviceContractOnly}
+            onChange={(e) => setServiceContractOnly(e.target.checked)}
+            className="w-4 h-4 rounded text-[#e03a14] focus:ring-[#e03a14] border-slate-300"
+          />
+          <span>{isAr ? 'يوجد عقد صيانة ساري' : 'With Service Contract'}</span>
+        </label>
+
+        <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-800 pt-1">
+          <input
+            type="checkbox"
+            checked={showSold}
+            onChange={(e) => setShowSold(e.target.checked)}
+            className="w-4 h-4 rounded text-[#e03a14] focus:ring-[#e03a14] border-slate-300"
+          />
+          <span>{isAr ? 'عرض السيارات المباعة أيضاً' : 'Include Sold Vehicles'}</span>
+        </label>
       </div>
     </div>
   );
@@ -282,9 +413,9 @@ function SearchContent() {
     <div className="min-h-screen bg-[#f8f9fa] py-6 sm:py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top Header Bar */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 mb-6 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-slate-900">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 mb-6 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-orange-50 text-[#e03a14] flex items-center justify-center font-bold text-slate-900">
+            <div className="w-10 h-10 rounded-xl bg-orange-50 text-[#e03a14] flex items-center justify-center font-bold">
               <Car className="w-5 h-5" />
             </div>
             <div>
@@ -298,11 +429,10 @@ function SearchContent() {
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-            {/* Mobile Filter Trigger */}
             <button
               type="button"
               onClick={() => setMobileFilterOpen(true)}
-              className="lg:hidden bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-2 px-3 rounded-xl flex items-center gap-1.5 transition text-slate-900"
+              className="lg:hidden bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-2 px-3 rounded-xl flex items-center gap-1.5 transition"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-[#e03a14]" />
               <span>{isAr ? 'تصفية' : 'Filters'}</span>
@@ -317,7 +447,7 @@ function SearchContent() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-[#e03a14] cursor-pointer text-slate-900"
+                className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14] cursor-pointer"
               >
                 <option value="default">{t('sortDefault')}</option>
                 <option value="newest">{t('sortNewest')}</option>
@@ -335,20 +465,20 @@ function SearchContent() {
 
         {/* Main Grid: Left Filter Sidebar + Right Listings */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-          <div className="hidden lg:block lg:col-span-1 bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs sticky top-24 text-slate-900">
+          <div className="hidden lg:block lg:col-span-1 bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs sticky top-24">
             <FilterControls />
           </div>
 
           <div className="lg:col-span-3">
             {loading ? (
               <div className="py-24 text-center">
-                <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#e03a14] border-t-transparent mx-auto mb-3 text-slate-900"></div>
+                <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#e03a14] border-t-transparent mx-auto mb-3"></div>
                 <p className="text-xs text-slate-500 font-semibold">
                   {isAr ? 'جاري تحديث نتائج البحث...' : 'Loading verified vehicles...'}
                 </p>
               </div>
             ) : listings.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-2xs text-slate-900">
+              <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-2xs">
                 <Car className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                 <h3 className="text-sm font-bold text-slate-800 mb-1">
                   {isAr ? 'لا توجد سيارات تطابق معايير البحث' : 'No cars match your search filters'}
@@ -380,8 +510,8 @@ function SearchContent() {
         {/* Mobile Filter Modal */}
         {mobileFilterOpen && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="bg-white rounded-t-3xl sm:rounded-3xl border border-slate-200 p-6 w-full max-w-md max-h-[85vh] overflow-y-auto shadow-2xl animate-in slide-in-from-bottom duration-200 text-slate-900">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4 text-slate-900">
+            <div className="bg-white rounded-t-3xl sm:rounded-3xl border border-slate-200 p-6 w-full max-w-md max-h-[85vh] overflow-y-auto shadow-2xl animate-in slide-in-from-bottom duration-200">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
                 <h3 className="text-sm font-black text-slate-900 flex items-center gap-1.5">
                   <SlidersHorizontal className="w-4 h-4 text-[#e03a14]" />
                   {isAr ? 'عوامل التصفية' : 'Search Filters'}
@@ -397,11 +527,11 @@ function SearchContent() {
 
               <FilterControls />
 
-              <div className="pt-5 border-t border-slate-100 mt-6 grid grid-cols-2 gap-2 text-slate-900">
+              <div className="pt-5 border-t border-slate-100 mt-6 grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="py-2.5 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 text-slate-900"
+                  className="py-2.5 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50"
                 >
                   {t('reset')}
                 </button>
