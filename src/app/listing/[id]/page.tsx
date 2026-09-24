@@ -285,13 +285,45 @@ export default function ListingDetailPage() {
 
   const activeImage = images[activeImageIndex] || null;
 
-  const handleShare = () => {
-    if (typeof window !== 'undefined') {
-      navigator.clipboard.writeText(window.location.href);
+  
+  const handleShare = async () => {
+    if (typeof window === "undefined") return;
+
+    const shareTitle = `${listing.year} ${listing.make} ${listing.model}`;
+    const shareText = `Check out this ${shareTitle} on memycar: ${formatPrice(price)}`;
+    const shareUrl = window.location.href;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: shareUrl,
+        });
+        return;
+      } catch (err: any) {
+        // If user cancelled share sheet, do nothing
+        if (err?.name === "AbortError") return;
+      }
+    }
+
+    // Fallback: Copy to clipboard
+    try {
+      await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      console.error("Clipboard copy failed", e);
     }
   };
+
+  const handleWhatsAppShare = () => {
+    if (typeof window === "undefined") return;
+    const shareTitle = `${listing.year} ${listing.make} ${listing.model}`;
+    const msg = encodeURIComponent(`Check out this ${shareTitle} on memycar.com: ${window.location.href}`);
+    window.open(`https://api.whatsapp.com/send?text=${msg}`, "_blank");
+  };
+
 
   return (
     <div className="min-h-screen bg-[#f4f4f4] py-6 md:py-10">
@@ -516,27 +548,39 @@ export default function ListingDetailPage() {
               )}
 
               {/* Save & Share Always Visible */}
-              <div className="grid grid-cols-2 gap-3 pt-1">
+              <div className="grid grid-cols-3 gap-2 pt-1">
                 <button
                   type="button"
                   disabled={saveLoading}
                   onClick={handleToggleSave}
-                  className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition ${
+                  className={`py-2 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition ${
                     saved
                       ? 'border-[#e03a14] text-[#e03a14] bg-orange-50 font-black'
                       : 'border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <Bookmark className={`w-3.5 h-3.5 ${saved ? 'fill-[#e03a14]' : ''}`} />
-                  {saved ? (isAr ? 'تم الحفظ' : 'Saved') : (isAr ? 'حفظ' : 'Save')}
+                  <span className="truncate">{saved ? (isAr ? 'محفوظ' : 'Saved') : (isAr ? 'حفظ' : 'Save')}</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={handleShare}
-                  className="py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                  className="py-2 px-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                  title="Share options"
                 >
-                  <Share2 className="w-3.5 h-3.5" />
-                  {copied ? t('linkCopied') : t('share')}
+                  <Share2 className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="truncate">{copied ? t('linkCopied') : t('share')}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleWhatsAppShare}
+                  className="py-2 px-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                  title="Share to WhatsApp"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span className="truncate">WhatsApp</span>
                 </button>
               </div>
 
