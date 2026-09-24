@@ -1,4 +1,3 @@
-import Logo from "@/components/ui/Logo";
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -6,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useLanguage } from '@/context/LanguageContext';
 import { createClient } from '@/lib/supabase/client';
+import Logo from '@/components/ui/Logo';
 import { 
   PlusCircle, 
   Search, 
@@ -13,7 +13,7 @@ import {
   LogIn, 
   Menu, 
   X, 
-  Globe
+  Globe 
 } from 'lucide-react';
 
 export default function Header() {
@@ -49,7 +49,7 @@ export default function Header() {
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-2">
-          {/* Brand Logo */}
+          {/* Brand Logo with Emblem */}
           <div className="flex items-center gap-2">
             <Logo size="md" />
           </div>
