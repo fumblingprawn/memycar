@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   MapPin,
   Camera,
+  Image as ImageIcon,
   CheckCircle2,
   RefreshCw
 } from 'lucide-react';
@@ -57,7 +58,7 @@ export default function SellPage() {
   const [city, setCity] = useState('');
   const [description, setDescription] = useState('');
 
-  // Structured Wireframe Photos (Index 0: Front, 1: Rear, 2: Side, 3: Interior)
+  // Structured Wireframe Photos
   const [wireframeFiles, setWireframeFiles] = useState<{ [key: string]: File | null }>({
     front: null,
     rear: null,
@@ -77,6 +78,15 @@ export default function SellPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Separate refs for Camera (capture="environment") vs File Gallery
+  const cameraInputRefs = {
+    front: useRef<HTMLInputElement>(null),
+    rear: useRef<HTMLInputElement>(null),
+    side: useRef<HTMLInputElement>(null),
+    interior: useRef<HTMLInputElement>(null),
+    additional: useRef<HTMLInputElement>(null),
+  };
 
   const fileInputRefs = {
     front: useRef<HTMLInputElement>(null),
@@ -114,7 +124,6 @@ export default function SellPage() {
     setTrim('');
   };
 
-  // Handle uploading specific angle wireframe photo
   const handleAngleFileSelect = (key: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -136,9 +145,11 @@ export default function SellPage() {
     if (fileInputRefs[key as keyof typeof fileInputRefs].current) {
       fileInputRefs[key as keyof typeof fileInputRefs].current!.value = '';
     }
+    if (cameraInputRefs[key as keyof typeof cameraInputRefs].current) {
+      cameraInputRefs[key as keyof typeof cameraInputRefs].current!.value = '';
+    }
   };
 
-  // Handle additional photos
   const handleAdditionalSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const currentWireCount = Object.values(wireframeFiles).filter(Boolean).length;
@@ -170,7 +181,6 @@ export default function SellPage() {
       return;
     }
 
-    // Gather all files (front wireframe first as cover, followed by other angles, then additionals)
     const allFilesToUpload: File[] = [];
     ['front', 'rear', 'side', 'interior'].forEach((k) => {
       if (wireframeFiles[k]) allFilesToUpload.push(wireframeFiles[k]!);
@@ -178,7 +188,7 @@ export default function SellPage() {
     allFilesToUpload.push(...additionalFiles);
 
     if (allFilesToUpload.length === 0) {
-      setErrorMsg(isAr ? 'يرجى تحميل صورة واحدة على الأقل للسيارة (يفضل زاوية الواجهة الأمامية)' : 'Please upload at least one photo (Front 3/4 recommended)');
+      setErrorMsg(isAr ? 'يرجى التقاط أو رفع صورة واحدة على الأقل للسيارة' : 'Please take or upload at least one photo (Front 3/4 recommended)');
       return;
     }
 
@@ -248,53 +258,43 @@ export default function SellPage() {
     );
   }
 
-  // Visual SVG Car Sketch Component
   const AngleIllustration = ({ type }: { type: string }) => {
     switch (type) {
       case 'front':
         return (
-          <svg className="w-14 h-9 text-slate-400 group-hover:text-[#e03a14] transition" viewBox="0 0 100 60" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            {/* Front 3/4 Wireframe Silhouette */}
+          <svg className="w-12 h-8 text-slate-400 group-hover:text-[#e03a14] transition" viewBox="0 0 100 60" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M 12 36 L 22 22 L 48 20 L 75 25 L 88 35 L 94 40 L 92 48 L 12 48 Z" />
             <path d="M 28 22 L 35 34 L 70 34 L 75 25" />
             <circle cx="28" cy="48" r="7" strokeWidth="2.5" fill="#f8f9fa" />
             <circle cx="78" cy="48" r="7" strokeWidth="2.5" fill="#f8f9fa" />
             <path d="M 40 37 L 65 37" />
-            <path d="M 16 38 L 22 37" />
           </svg>
         );
       case 'rear':
         return (
-          <svg className="w-14 h-9 text-slate-400 group-hover:text-[#e03a14] transition" viewBox="0 0 100 60" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            {/* Rear 3/4 Wireframe Silhouette */}
+          <svg className="w-12 h-8 text-slate-400 group-hover:text-[#e03a14] transition" viewBox="0 0 100 60" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M 88 36 L 78 22 L 52 20 L 25 25 L 12 35 L 6 40 L 8 48 L 88 48 Z" />
             <path d="M 72 22 L 65 34 L 30 34 L 25 25" />
             <circle cx="72" cy="48" r="7" strokeWidth="2.5" fill="#f8f9fa" />
             <circle cx="22" cy="48" r="7" strokeWidth="2.5" fill="#f8f9fa" />
             <path d="M 60 37 L 35 37" />
-            <path d="M 84 38 L 78 37" />
           </svg>
         );
       case 'side':
         return (
-          <svg className="w-14 h-9 text-slate-400 group-hover:text-[#e03a14] transition" viewBox="0 0 100 60" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            {/* Full Side Profile Silhouette */}
+          <svg className="w-12 h-8 text-slate-400 group-hover:text-[#e03a14] transition" viewBox="0 0 100 60" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M 8 42 L 14 36 L 25 36 L 38 24 L 68 24 L 84 34 L 95 38 L 95 44 L 8 44 Z" />
             <circle cx="26" cy="44" r="8" strokeWidth="2.5" fill="#f8f9fa" />
             <circle cx="76" cy="44" r="8" strokeWidth="2.5" fill="#f8f9fa" />
             <path d="M 39 26 L 53 26 L 53 36 L 28 36 Z" />
-            <path d="M 57 26 L 67 26 L 79 36 L 57 36 Z" />
           </svg>
         );
       case 'interior':
       default:
         return (
-          <svg className="w-14 h-9 text-slate-400 group-hover:text-[#e03a14] transition" viewBox="0 0 100 60" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            {/* Dashboard / Cockpit Silhouette */}
+          <svg className="w-12 h-8 text-slate-400 group-hover:text-[#e03a14] transition" viewBox="0 0 100 60" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M 10 46 L 20 28 L 80 28 L 90 46 Z" />
             <circle cx="34" cy="40" r="10" strokeWidth="2.5" />
-            <path d="M 34 35 L 34 45" />
-            <path d="M 29 40 L 39 40" />
             <rect x="52" y="32" width="22" height="12" rx="2" strokeWidth="2" />
           </svg>
         );
@@ -344,7 +344,6 @@ export default function SellPage() {
               </h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Make */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
                     {t('make')} *
@@ -364,7 +363,6 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* Model */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
                     {t('model')} *
@@ -386,7 +384,6 @@ export default function SellPage() {
                 </div>
               </div>
 
-              {/* Trim / Edition directly under Model */}
               <div>
                 <label className="text-xs font-bold text-slate-900 block mb-1.5">
                   {isAr ? 'الفئة / الإصدار (Trim / Edition)' : 'Trim / Edition (Optional)'}
@@ -401,7 +398,6 @@ export default function SellPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* Year */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
                     {t('year')} *
@@ -419,7 +415,6 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* Price */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
                     {t('priceAed')} *
@@ -435,7 +430,6 @@ export default function SellPage() {
                   />
                 </div>
 
-                {/* Mileage */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
                     {t('mileageKm')} *
@@ -460,7 +454,6 @@ export default function SellPage() {
               </h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* Regional Specs */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
                     {t('specs')} *
@@ -480,7 +473,6 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* Fuel Type */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
                     {t('fuelType')} *
@@ -498,7 +490,6 @@ export default function SellPage() {
                   </select>
                 </div>
 
-                {/* Transmission */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
                     {t('transmission')} *
@@ -517,7 +508,6 @@ export default function SellPage() {
                 </div>
               </div>
 
-              {/* Warranty & Service Contract */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
@@ -553,7 +543,7 @@ export default function SellPage() {
               </div>
             </div>
 
-            {/* 3. LOCATION & CONTACT */}
+            {/* 3. LOCATION */}
             <div className="space-y-3 pt-4 border-t border-slate-100">
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-[#e03a14]" />
@@ -591,31 +581,41 @@ export default function SellPage() {
               />
             </div>
 
-            {/* 5. INTERACTIVE WIREFRAME ANGLE UPLOAD SLOTS */}
+            {/* 5. WIREFRAME ANGLE UPLOAD SLOTS WITH BOTH CAMERA & GALLERY BUTTONS */}
             <div className="space-y-4 pt-4 border-t border-slate-100">
               <div>
                 <label className="text-xs font-bold text-slate-900 block">
-                  {isAr ? 'التقاط صور الزوايا الرئيسية للمركبة *' : 'Capture Key Vehicle Angles (Click each box) *'}
+                  {isAr ? 'صور زوايا السيارة الرئيسية (التقاط بالكاميرا أو اختيار ملف) *' : 'Capture Key Vehicle Angles (Camera or File) *'}
                 </label>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  {isAr ? 'انقر على أي زاوية لرفع الصورة المطلوبة مباشرة' : 'Click on any slot to upload or snap that specific angle'}
+                  {isAr ? 'يمكنك التقاط الصورة مباشرة بالكاميرا أو اختيار صورة من المعرض' : 'Snap a fresh photo with your camera or select an existing photo'}
                 </p>
               </div>
 
-              {/* 4 Dedicated Upload Angle Boxes */}
+              {/* 4 Angle Slots */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {ANGLE_SLOTS.map((slot) => {
                   const preview = wireframePreviews[slot.key];
                   return (
                     <div
                       key={slot.key}
-                      onClick={() => fileInputRefs[slot.key].current?.click()}
-                      className={`relative aspect-[4/3] rounded-2xl border-2 transition cursor-pointer flex flex-col items-center justify-center p-3 text-center group overflow-hidden ${
+                      className={`relative rounded-2xl border-2 transition flex flex-col justify-between p-3 text-center group overflow-hidden ${
                         preview
-                          ? 'border-emerald-500 bg-slate-900'
-                          : 'border-dashed border-slate-300 hover:border-[#e03a14] bg-slate-50 hover:bg-orange-50/20'
+                          ? 'border-emerald-500 bg-slate-900 aspect-[4/3]'
+                          : 'border-dashed border-slate-300 bg-slate-50 min-h-[175px]'
                       }`}
                     >
+                      {/* Hidden Camera Input (launches camera directly) */}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        ref={cameraInputRefs[slot.key]}
+                        onChange={(e) => handleAngleFileSelect(slot.key, e)}
+                        className="hidden"
+                      />
+
+                      {/* Hidden File Picker Input (opens gallery/files) */}
                       <input
                         type="file"
                         accept="image/*"
@@ -632,15 +632,28 @@ export default function SellPage() {
                             alt={slot.titleEn}
                             className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition"
                           />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
-                            <span className="bg-white/90 text-slate-800 text-[10px] font-bold py-1 px-2 rounded-lg flex items-center gap-1">
-                              <RefreshCw className="w-3 h-3 text-[#e03a14]" />
-                              {isAr ? 'تغيير' : 'Change'}
-                            </span>
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5 p-2">
+                            <button
+                              type="button"
+                              onClick={() => cameraInputRefs[slot.key].current?.click()}
+                              className="bg-white/95 text-slate-900 text-[10px] font-bold p-1.5 rounded-lg flex items-center gap-1 shadow-sm hover:bg-white"
+                              title="Retake with camera"
+                            >
+                              <Camera className="w-3.5 h-3.5 text-[#e03a14]" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => fileInputRefs[slot.key].current?.click()}
+                              className="bg-white/95 text-slate-900 text-[10px] font-bold p-1.5 rounded-lg flex items-center gap-1 shadow-sm hover:bg-white"
+                              title="Replace from file"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5 text-slate-600" />
+                            </button>
                             <button
                               type="button"
                               onClick={(e) => handleRemoveAnglePhoto(slot.key, e)}
-                              className="bg-red-600 text-white p-1 rounded-lg hover:bg-red-700 transition"
+                              className="bg-red-600 text-white p-1.5 rounded-lg hover:bg-red-700 transition shadow-sm"
+                              title="Remove"
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
@@ -648,23 +661,44 @@ export default function SellPage() {
                           <div className="absolute top-2 left-2 bg-emerald-500 text-white rounded-full p-0.5 shadow-sm">
                             <CheckCircle2 className="w-3.5 h-3.5" />
                           </div>
-                          <span className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-xs text-white text-[9px] font-bold py-0.5 rounded truncate px-1">
+                          <span className="absolute bottom-2 left-2 right-2 bg-black/70 backdrop-blur-xs text-white text-[9px] font-bold py-0.5 rounded truncate px-1">
                             {isAr ? slot.titleAr : slot.titleEn}
                           </span>
                         </>
                       ) : (
-                        <>
+                        <div className="flex flex-col items-center justify-between h-full">
                           <AngleIllustration type={slot.key} />
-                          <div className="mt-2">
-                            <span className="text-[11px] font-black text-slate-800 group-hover:text-[#e03a14] block leading-tight">
+
+                          <div className="my-1.5">
+                            <span className="text-[11px] font-black text-slate-800 block leading-tight">
                               {isAr ? slot.titleAr : slot.titleEn}
                             </span>
-                            <span className="text-[9px] text-slate-400 mt-0.5 flex items-center justify-center gap-1">
-                              <Camera className="w-2.5 h-2.5 text-[#e03a14]" />
-                              {isAr ? 'انقر للرفع' : 'Click to add'}
+                            <span className="text-[9px] text-slate-400 block mt-0.5">
+                              {isAr ? slot.subAr : slot.subEn}
                             </span>
                           </div>
-                        </>
+
+                          {/* Dual Action Buttons: Camera + File */}
+                          <div className="grid grid-cols-2 gap-1.5 w-full pt-1">
+                            <button
+                              type="button"
+                              onClick={() => cameraInputRefs[slot.key].current?.click()}
+                              className="bg-[#e03a14] hover:bg-[#c53210] active:scale-95 text-white py-1.5 px-1 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 shadow-2xs transition"
+                            >
+                              <Camera className="w-3 h-3 flex-shrink-0" />
+                              <span>{isAr ? 'كاميرا' : 'Camera'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => fileInputRefs[slot.key].current?.click()}
+                              className="bg-white hover:bg-slate-100 border border-slate-200 active:scale-95 text-slate-700 py-1.5 px-1 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 shadow-2xs transition"
+                            >
+                              <ImageIcon className="w-3 h-3 flex-shrink-0 text-slate-500" />
+                              <span>{isAr ? 'ملف' : 'File'}</span>
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   );
@@ -694,11 +728,16 @@ export default function SellPage() {
                     </div>
                   ))}
 
-                  <label className="aspect-square rounded-xl border-2 border-dashed border-slate-300 hover:border-[#e03a14] flex flex-col items-center justify-center cursor-pointer transition bg-slate-50 hover:bg-orange-50/20">
-                    <Upload className="w-4 h-4 text-slate-400 group-hover:text-[#e03a14]" />
-                    <span className="text-[9px] text-slate-500 font-bold mt-1">
-                      {isAr ? '+ صورة' : '+ Add'}
-                    </span>
+                  {/* Additional Photo Camera & Gallery Uploaders */}
+                  <div className="aspect-square rounded-xl border-2 border-dashed border-slate-300 p-1 flex flex-col justify-center gap-1 bg-slate-50">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      ref={cameraInputRefs.additional}
+                      onChange={handleAdditionalSelect}
+                      className="hidden"
+                    />
                     <input
                       type="file"
                       multiple
@@ -707,7 +746,25 @@ export default function SellPage() {
                       onChange={handleAdditionalSelect}
                       className="hidden"
                     />
-                  </label>
+
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRefs.additional.current?.click()}
+                      className="flex-1 bg-[#e03a14] hover:bg-[#c53210] active:scale-95 text-white rounded-lg flex items-center justify-center gap-1 text-[9px] font-bold transition"
+                    >
+                      <Camera className="w-3 h-3" />
+                      <span>{isAr ? 'كاميرا' : 'Camera'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => fileInputRefs.additional.current?.click()}
+                      className="flex-1 bg-white hover:bg-slate-100 border border-slate-200 active:scale-95 text-slate-700 rounded-lg flex items-center justify-center gap-1 text-[9px] font-bold transition"
+                    >
+                      <Upload className="w-3 h-3 text-slate-400" />
+                      <span>{isAr ? 'ملف' : 'File'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
