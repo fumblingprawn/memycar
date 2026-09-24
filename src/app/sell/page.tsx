@@ -9,14 +9,9 @@ import {
   Car, 
   Upload, 
   X, 
-  CheckCircle2, 
   AlertCircle, 
   Loader2, 
-  ArrowLeft,
-  ShieldCheck,
-  Fuel,
-  Cog,
-  FileText
+  ArrowLeft
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -28,19 +23,19 @@ export default function SellPage() {
   const [user, setUser] = useState<any>(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
-  // Form Fields
+  // Form Fields - None preselected
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
   const [trim, setTrim] = useState('');
-  const [year, setYear] = useState<number>(new Date().getFullYear());
+  const [year, setYear] = useState<string>('');
   const [price, setPrice] = useState<string>('');
   const [mileage, setMileage] = useState<string>('');
-  const [specs, setSpecs] = useState('GCC Specs');
-  const [fuelType, setFuelType] = useState('Petrol');
-  const [transmission, setTransmission] = useState('Automatic');
-  const [warranty, setWarranty] = useState('No');
-  const [serviceContract, setServiceContract] = useState('No');
-  const [city, setCity] = useState('Dubai');
+  const [specs, setSpecs] = useState('');
+  const [city, setCity] = useState('');
+  const [fuelType, setFuelType] = useState('');
+  const [transmission, setTransmission] = useState('');
+  const [warranty, setWarranty] = useState('');
+  const [serviceContract, setServiceContract] = useState('');
   const [description, setDescription] = useState('');
 
   // Media & Submission State
@@ -102,6 +97,12 @@ export default function SellPage() {
     if (!user) return;
     setErrorMsg(null);
 
+    // Validation checks for explicit selection
+    if (!make || !model || !year || !price || !mileage || !specs || !city || !fuelType || !transmission || !warranty || !serviceContract) {
+      setErrorMsg(isAr ? 'يرجى ملء واختيار كافة الحقول المطلوبة' : 'Please complete all required fields');
+      return;
+    }
+
     if (imageFiles.length === 0) {
       setErrorMsg(isAr ? 'يرجى تحميل صورة واحدة على الأقل للسيارة' : 'Please upload at least one photo of the vehicle');
       return;
@@ -109,7 +110,6 @@ export default function SellPage() {
 
     setSubmitting(true);
     try {
-      // 1. Upload Images to Supabase Storage
       const uploadedUrls: string[] = [];
       for (const file of imageFiles) {
         const fileExt = file.name.split('.').pop() || 'jpg';
@@ -119,10 +119,7 @@ export default function SellPage() {
           .from('listing-images')
           .upload(fileName, file, { contentType: file.type });
 
-        if (uploadErr) {
-          // If storage bucket fails, fallback to general storage or placeholder
-          console.warn('Storage upload error:', uploadErr);
-        } else {
+        if (!uploadErr) {
           const { data: publicData } = supabase.storage
             .from('listing-images')
             .getPublicUrl(fileName);
@@ -130,7 +127,6 @@ export default function SellPage() {
         }
       }
 
-      // 2. Insert Listing
       const sellerName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Member';
       const sellerPhone = user.user_metadata?.phone || '';
 
@@ -141,7 +137,7 @@ export default function SellPage() {
           make,
           model,
           trim: trim.trim() || null,
-          year: parseInt(year.toString(), 10),
+          year: parseInt(year, 10),
           price: parseFloat(price),
           mileage: parseInt(mileage, 10),
           specs,
@@ -181,7 +177,6 @@ export default function SellPage() {
   return (
     <div className="min-h-screen bg-[#f8f9fa] py-8">
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
-        {/* Back Link */}
         <Link
           href="/dashboard"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 mb-6 transition"
@@ -287,11 +282,12 @@ export default function SellPage() {
                   <select
                     required
                     value={year}
-                    onChange={(e) => setYear(parseInt(e.target.value, 10))}
+                    onChange={(e) => setYear(e.target.value)}
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
                   >
+                    <option value="">{t('selectYear')}</option>
                     {years.map((y) => (
-                      <option key={y} value={y}>{y}</option>
+                      <option key={y} value={y.toString()}>{y}</option>
                     ))}
                   </select>
                 </div>
@@ -337,7 +333,7 @@ export default function SellPage() {
               </h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Regional Specs (with Other added) */}
+                {/* Regional Specs */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
                     {t('specs')} *
@@ -348,6 +344,7 @@ export default function SellPage() {
                     onChange={(e) => setSpecs(e.target.value)}
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
                   >
+                    <option value="">{t('selectSpecs')}</option>
                     {specsList.map((sp) => (
                       <option key={sp} value={sp}>
                         {sp === 'Other' ? (isAr ? 'أخرى' : 'Other') : t(sp)}
@@ -367,6 +364,7 @@ export default function SellPage() {
                     onChange={(e) => setCity(e.target.value)}
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
                   >
+                    <option value="">{t('selectEmirate')}</option>
                     {emirates.map((em) => (
                       <option key={em} value={em}>{t(em)}</option>
                     ))}
@@ -384,6 +382,7 @@ export default function SellPage() {
                     onChange={(e) => setFuelType(e.target.value)}
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
                   >
+                    <option value="">{t('selectFuel')}</option>
                     {fuelList.map((f) => (
                       <option key={f} value={f}>{t(f)}</option>
                     ))}
@@ -401,6 +400,7 @@ export default function SellPage() {
                     onChange={(e) => setTransmission(e.target.value)}
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
                   >
+                    <option value="">{t('selectTransmission')}</option>
                     {transList.map((tr) => (
                       <option key={tr} value={tr}>{t(tr)}</option>
                     ))}
@@ -408,9 +408,9 @@ export default function SellPage() {
                 </div>
               </div>
 
-              {/* Warranty & Service Contract (Yes / No) */}
+              {/* Warranty & Service Contract */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                {/* Warranty: Yes / No */}
+                {/* Warranty */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
                     {t('warranty')} *
@@ -421,12 +421,13 @@ export default function SellPage() {
                     onChange={(e) => setWarranty(e.target.value)}
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
                   >
-                    <option value="Yes">{isAr ? 'نعم (يوجد ضمان)' : 'Yes (Under Warranty)'}</option>
-                    <option value="No">{isAr ? 'لا (بدون ضمان)' : 'No (No Warranty)'}</option>
+                    <option value="">{t('selectWarranty')}</option>
+                    <option value="Yes">{isAr ? 'نعم (يوجد ضمان)' : 'Yes'}</option>
+                    <option value="No">{isAr ? 'لا (بدون ضمان)' : 'No'}</option>
                   </select>
                 </div>
 
-                {/* Service Contract: Yes / No (Under Warranty) */}
+                {/* Service Contract */}
                 <div>
                   <label className="text-xs font-bold text-slate-900 block mb-1.5">
                     {isAr ? 'عقد صيانة (Service Contract) *' : 'Service Contract *'}
@@ -437,6 +438,7 @@ export default function SellPage() {
                     onChange={(e) => setServiceContract(e.target.value)}
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-[#e03a14]"
                   >
+                    <option value="">{t('selectServiceContract')}</option>
                     <option value="Yes">{isAr ? 'نعم (يوجد عقد صيانة)' : 'Yes'}</option>
                     <option value="No">{isAr ? 'لا (بدون عقد صيانة)' : 'No'}</option>
                   </select>
