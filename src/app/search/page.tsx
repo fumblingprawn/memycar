@@ -1,5 +1,7 @@
 'use client';
 
+import SaveSearchButton from '@/components/search/SaveSearchButton';
+
 import React, { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -227,7 +229,25 @@ function SearchContent() {
           <option value="">{make ? (isAr ? 'كافة الموديلات' : 'All Models') : t('selectMakeFirst')}</option>
           {selectedMakeObj?.models.map((item, idx) => {
             if (typeof item === 'string') {
-              return (
+                // Active filter payload for SaveSearchButton
+  const activeFilterParams: Record<string, string> = {};
+  if (make) activeFilterParams['make'] = make;
+  if (model) activeFilterParams['model'] = model;
+  if (yearFrom) activeFilterParams['year_from'] = yearFrom;
+  if (yearTo) activeFilterParams['year_to'] = yearTo;
+  if (priceFrom) activeFilterParams['price_from'] = priceFrom;
+  if (priceTo) activeFilterParams['price_to'] = priceTo;
+  if (maxMileage) activeFilterParams['mileage_to'] = maxMileage;
+  if (emirate) activeFilterParams['emirate'] = emirate;
+  if (specs) activeFilterParams['specs'] = specs;
+  if (fuelType) activeFilterParams['fuel'] = fuelType;
+  if (transmission) activeFilterParams['trans'] = transmission;
+  if (warrantyOnly) activeFilterParams['warranty'] = 'yes';
+  if (serviceContractOnly) activeFilterParams['service_contract'] = 'yes';
+
+  const searchSummaryTitle = [make, model].filter(Boolean).join(' ') || (isAr ? 'بحث مخصص' : 'Custom Search');
+
+  return (
                 <option key={idx} value={item}>
                   {item}
                 </option>
@@ -437,6 +457,10 @@ function SearchContent() {
               <SlidersHorizontal className="w-3.5 h-3.5 text-[#e03a14]" />
               <span>{isAr ? 'تصفية' : 'Filters'}</span>
             </button>
+            <SaveSearchButton
+              currentParams={activeFilterParams}
+              searchSummaryTitle={searchSummaryTitle}
+            />
 
             {/* Dubizzle-Style Sort Dropdown */}
             <div className="flex items-center gap-2">

@@ -50,7 +50,7 @@ function DashboardContent() {
   const initialTab = (searchParams.get('tab') as any) || 'listings';
   const initialConvId = searchParams.get('conv') || null;
 
-  const [activeTab, setActiveTab] = useState<'listings' | 'saved' | 'messages' | 'account'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'listings' | 'searches' | 'saved' | 'messages' | 'account'>(initialTab);
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [myListings, setMyListings] = useState<any[]>([]);
@@ -637,6 +637,18 @@ function DashboardContent() {
             {t('myListings')} ({myListings.length})
           </button>
 
+                    <button
+            onClick={() => setActiveTab('searches')}
+            className={`flex items-center gap-2 py-2 px-4 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+              activeTab === 'searches'
+                ? 'bg-slate-900 text-white'
+                : 'text-slate-600 hover:bg-slate-200/60'
+            }`}
+          >
+            <Bookmark className="w-4 h-4 text-[#e03a14]" />
+            {isAr ? 'عمليات البحث المحفوظة' : 'Saved Searches'}
+          </button>
+
           <button
             onClick={() => setActiveTab('saved')}
             className={`flex items-center gap-2 py-2 px-4 rounded-xl text-xs font-bold transition whitespace-nowrap ${
@@ -764,6 +776,26 @@ function DashboardContent() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+                {/* TAB: DEDICATED SAVED SEARCHES & ALERTS */}
+        {activeTab === 'searches' && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs">
+              <div className="mb-6">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Bookmark className="w-5 h-5 text-[#e03a14]" />
+                  {isAr ? 'عمليات البحث المحفوظة والتنبيهات' : 'Saved Searches & Notifications'}
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  {isAr
+                    ? 'تابع أحدث الإعلانات التي تطابق معاييرك واستلم إشعاراً فور إضافة سيارات جديدة.'
+                    : 'Track listings matching your criteria and get notified when new cars are uploaded.'}
+                </p>
+              </div>
+              <SavedSearchesList />
+            </div>
           </div>
         )}
 
