@@ -56,6 +56,24 @@ function SearchContent() {
   const [serviceContractOnly, setServiceContractOnly] = useState(searchParams.get('service_contract') === 'yes');
   const [showSold, setShowSold] = useState(false);
 
+  // Active filter payload for SaveSearchButton
+  const activeFilterParams: Record<string, string> = {};
+  if (make) activeFilterParams['make'] = make;
+  if (model) activeFilterParams['model'] = model;
+  if (yearFrom) activeFilterParams['year_from'] = yearFrom;
+  if (yearTo) activeFilterParams['year_to'] = yearTo;
+  if (priceFrom) activeFilterParams['price_from'] = priceFrom;
+  if (priceTo) activeFilterParams['price_to'] = priceTo;
+  if (maxMileage) activeFilterParams['mileage_to'] = maxMileage;
+  if (emirate) activeFilterParams['emirate'] = emirate;
+  if (specs) activeFilterParams['specs'] = specs;
+  if (fuelType) activeFilterParams['fuel'] = fuelType;
+  if (transmission) activeFilterParams['trans'] = transmission;
+  if (warrantyOnly) activeFilterParams['warranty'] = 'yes';
+  if (serviceContractOnly) activeFilterParams['service_contract'] = 'yes';
+
+  const searchSummaryTitle = [make, model].filter(Boolean).join(' ') || (isAr ? 'بحث مخصص' : 'Custom Search');
+
   const emirateOptions = ['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain'];
   const specsOptions = ['GCC Specs', 'Non-GCC / American', 'Non-GCC / Japanese', 'Non-GCC / European', 'Other'];
   const fuelOptions = ['Petrol', 'Diesel', 'Hybrid', 'Electric'];
@@ -229,23 +247,6 @@ function SearchContent() {
           <option value="">{make ? (isAr ? 'كافة الموديلات' : 'All Models') : t('selectMakeFirst')}</option>
           {selectedMakeObj?.models.map((item, idx) => {
             if (typeof item === 'string') {
-                // Active filter payload for SaveSearchButton
-  const activeFilterParams: Record<string, string> = {};
-  if (make) activeFilterParams['make'] = make;
-  if (model) activeFilterParams['model'] = model;
-  if (yearFrom) activeFilterParams['year_from'] = yearFrom;
-  if (yearTo) activeFilterParams['year_to'] = yearTo;
-  if (priceFrom) activeFilterParams['price_from'] = priceFrom;
-  if (priceTo) activeFilterParams['price_to'] = priceTo;
-  if (maxMileage) activeFilterParams['mileage_to'] = maxMileage;
-  if (emirate) activeFilterParams['emirate'] = emirate;
-  if (specs) activeFilterParams['specs'] = specs;
-  if (fuelType) activeFilterParams['fuel'] = fuelType;
-  if (transmission) activeFilterParams['trans'] = transmission;
-  if (warrantyOnly) activeFilterParams['warranty'] = 'yes';
-  if (serviceContractOnly) activeFilterParams['service_contract'] = 'yes';
-
-  const searchSummaryTitle = [make, model].filter(Boolean).join(' ') || (isAr ? 'بحث مخصص' : 'Custom Search');
 
   return (
                 <option key={idx} value={item}>
