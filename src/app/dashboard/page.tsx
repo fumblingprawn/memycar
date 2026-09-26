@@ -1,5 +1,8 @@
 'use client';
 
+import DealerDashboardHeader from '@/components/dashboard/DealerDashboardHeader';
+import SavedSearchesList from '@/components/dashboard/SavedSearchesList';
+
 import React, { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -49,6 +52,7 @@ function DashboardContent() {
 
   const [activeTab, setActiveTab] = useState<'listings' | 'saved' | 'messages' | 'account'>(initialTab);
   const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [myListings, setMyListings] = useState<any[]>([]);
   const [savedListings, setSavedListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +99,14 @@ function DashboardContent() {
     }
 
     setUser(user);
+
+    // Fetch extended profile for dealer data
+    const { data: profileRow } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+    if (profileRow) setProfile(profileRow);
     const savedName = user.user_metadata?.full_name || '';
     const savedPhone = user.user_metadata?.phone || '';
     
@@ -608,6 +620,9 @@ function DashboardContent() {
           </div>
         </div>
 
+        {/* Dealer Branded Header (Only renders for verified/dealer user types) */}
+        {profile && <DealerDashboardHeader profile={profile} onRefresh={fetchUserData} />}
+
         {/* Tab Controls */}
         <div className="flex gap-2 border-b border-slate-200 mb-6 pb-2 overflow-x-auto">
           <button
@@ -783,6 +798,14 @@ function DashboardContent() {
                 ))}
               </div>
             )}
+
+            <div className="mt-12 pt-8 border-t border-slate-200">
+              <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <Bookmark className="w-4 h-4 text-[#e03a14]" />
+                {isAr ? 'عمليات البحث المحفوظة والتنبيهات' : 'Saved Searches & Alerts'}
+              </h3>
+              <SavedSearchesList />
+            </div>
           </div>
         )}
 
